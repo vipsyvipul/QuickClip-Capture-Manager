@@ -33,7 +33,7 @@ const ALL_COLUMNS: ColumnDef[] = [
     { key: 'domain',       label: 'Domain',       sortKey: 'domain' },
     { key: 'saved_at',     label: 'Saved',        sortKey: 'saved_at' },
     { key: 'tags',         label: 'Tags' },
-    { key: 'path',         label: 'File' },
+    { key: 'path',         label: 'File Path' },
 ]
 
 export class ClipManagerView extends ItemView {
