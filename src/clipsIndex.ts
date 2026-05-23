@@ -43,7 +43,8 @@ export async function deleteClip(app: App, url: string, hash: string): Promise<v
     }
     await saveIndex(app, index)
 
-    if (clip.clip_type === 'full-page') {
+    const isWholeFile = clip.clip_type === 'full-page' || clip.clip_type === 'transcript' || clip.clip_type === 'tweet'
+    if (isWholeFile) {
         const file = app.vault.getAbstractFileByPath(clip.path)
         if (file instanceof TFile) await app.vault.delete(file)
     } else {
@@ -69,7 +70,7 @@ async function removeHighlightFromFile(app: App, clip: Clip): Promise<void> {
     // Walk backwards to find the > [!quote] Clip line
     let blockStart = capturedLineIdx
     for (let i = capturedLineIdx - 1; i >= 0; i--) {
-        if (lines[i].startsWith('> [!quote] Clip')) {
+        if (lines[i].startsWith('> [!quote]')) {
             blockStart = i
             break
         }
@@ -101,10 +102,27 @@ async function removeHighlightFromFile(app: App, clip: Clip): Promise<void> {
     // Also consume the blank line before the block
     const startWithBlank = blockStart > 0 && lines[blockStart - 1] === '' ? blockStart - 1 : blockStart
 
-    const updated = [
+    const afterRemoval = [
         ...lines.slice(0, startWithBlank),
         ...lines.slice(blockEnd),
     ].join('\n')
 
-    await app.vault.modify(file, updated)
+    await app.vault.modify(file, removeOrphanedHeadings(afterRemoval))
+}
+
+function removeOrphanedHeadings(content: string): string {
+    const lines = content.split('\n')
+    const toRemove = new Set<number>()
+
+    for (let i = 0; i < lines.length; i++) {
+        if (!lines[i].startsWith('# ')) continue
+        // Find where the next heading starts (or EOF)
+        let j = i + 1
+        while (j < lines.length && !lines[j].startsWith('# ')) j++
+        // Heading is orphaned if everything between it and the next heading is blank
+        const hasContent = lines.slice(i + 1, j).some(l => l.trim() !== '')
+        if (!hasContent) toRemove.add(i)
+    }
+
+    return lines.filter((_, i) => !toRemove.has(i)).join('\n')
 }
