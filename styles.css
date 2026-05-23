@@ -257,9 +257,6 @@ td.qc-col-drag-after  { border-right: 2px solid var(--color-accent); }
     background: var(--background-secondary);
 }
 
-.qc-row:hover .qc-delete-btn {
-    opacity: 1;
-}
 
 .qc-cell--snippet { min-width: 130px; }
 
@@ -297,7 +294,7 @@ td.qc-col-drag-after  { border-right: 2px solid var(--color-accent); }
 }
 
 .qc-cell--delete {
-    text-align: right;
+    text-align: center;
     width: 36px;
 }
 
@@ -342,8 +339,7 @@ td.qc-col-drag-after  { border-right: 2px solid var(--color-accent); }
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 0.85em;
-    opacity: 0;
-    transition: opacity 0.1s, background 0.1s;
+    transition: background 0.1s;
 }
 
 .qc-delete-btn:hover {

@@ -29,7 +29,7 @@ interface ColumnDef {
 const ALL_COLUMNS: ColumnDef[] = [
     { key: 'clip_type',    label: 'Format',       sortKey: 'clip_type' },
     { key: 'content_type', label: 'Content Type', sortKey: 'content_type' },
-    { key: 'page_title',   label: 'Page',         sortKey: 'page_title' },
+    { key: 'page_title',   label: 'Source Title',  sortKey: 'page_title' },
     { key: 'domain',       label: 'Domain',       sortKey: 'domain' },
     { key: 'saved_at',     label: 'Saved',        sortKey: 'saved_at' },
     { key: 'tags',         label: 'Tags' },
@@ -53,6 +53,12 @@ export class ClipManagerView extends ItemView {
     getIcon(): string { return 'scissors' }
 
     async onOpen(): Promise<void> {
+        this.registerEvent(
+            this.app.vault.on('modify', (file) => {
+                if (file instanceof TFile && file.path === '.quickclip/clipsHistory.json')
+                    this.refresh()
+            })
+        )
         await this.refresh()
     }
 
@@ -176,7 +182,7 @@ export class ClipManagerView extends ItemView {
             if (!this.isColVisible(col)) continue
             this.addDraggableHeader(headerRow, col)
         }
-        headerRow.createEl('th', { cls: 'qc-th-delete' })
+        headerRow.createEl('th', { text: 'Delete', cls: 'qc-th-delete' })
 
         const tbody = table.createEl('tbody')
         for (const ref of sorted) this.renderRow(tbody, ref, orderedCols)
@@ -377,6 +383,7 @@ export class ClipManagerView extends ItemView {
         }
 
         await this.app.workspace.getLeaf(false).openFile(file, {
+            state: { mode: 'preview' },
             eState: line > 0 ? { line } : undefined,
         })
     }
@@ -392,7 +399,7 @@ export class ClipManagerView extends ItemView {
         const capturedLineIdx = lines.findIndex(l => l.includes(capturedMarker))
         if (capturedLineIdx === -1) return 0
         for (let i = capturedLineIdx - 1; i >= 0; i--) {
-            if (lines[i].startsWith('> [!quote] Clip')) return i
+            if (lines[i].startsWith('> [!quote]')) return i
         }
         return capturedLineIdx
     }
