@@ -2,6 +2,7 @@ import { MarkdownView, Plugin } from 'obsidian'
 import { processHighlight, scanAndTransform } from './renderers/highlight'
 import { processFullPage, injectFullPageHeader } from './renderers/fullPage'
 import { ClipManagerView, VIEW_CLIP_MANAGER } from './views/ClipManagerView'
+import { QuickClipSettingTab } from './settings'
 
 export interface PluginSettings {
     visibleColumns: string[]
@@ -9,6 +10,12 @@ export interface PluginSettings {
     filterFormat: string
     filterSource: string
     filterDate: string
+    confirmDelete: boolean
+    rowDensity: 'compact' | 'comfortable' | 'spacious'
+    snippetLength: number
+    dateFormat: 'absolute' | 'relative' | 'full'
+    filePathDisplay: 'full' | 'filename'
+    autoOpenOnStartup: boolean
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -17,6 +24,12 @@ const DEFAULT_SETTINGS: PluginSettings = {
     filterFormat: '',
     filterSource: '',
     filterDate: '',
+    confirmDelete: false,
+    rowDensity: 'comfortable',
+    snippetLength: 20,
+    dateFormat: 'absolute',
+    filePathDisplay: 'full',
+    autoOpenOnStartup: false,
 }
 
 export default class QuickClipCapturePlugin extends Plugin {
@@ -50,6 +63,11 @@ export default class QuickClipCapturePlugin extends Plugin {
                 }, 100)
             })
         )
+
+        this.addSettingTab(new QuickClipSettingTab(this.app, this))
+
+        if (this.settings.autoOpenOnStartup)
+            this.app.workspace.onLayoutReady(() => this.activateView())
 
         this.addRibbonIcon('scissors', 'QuickClip Capture', () => this.activateView())
 

@@ -249,6 +249,9 @@ td.qc-col-drag-after  { border-right: 2px solid var(--interactive-accent); }
     vertical-align: middle;
 }
 
+.qc-density-compact  .qc-row td { padding: 3px 8px; }
+.qc-density-spacious .qc-row td { padding: 13px 10px; }
+
 .qc-cell--snippet { min-width: 130px; }
 
 .qc-snippet-link {

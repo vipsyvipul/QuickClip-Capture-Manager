@@ -364,6 +364,8 @@ export class ClipManagerView extends ItemView {
         panel.addEventListener('click', (e) => e.stopPropagation())
     }
 
+    public rerenderTable(): void { this.renderTableOnly() }
+
     private renderTableOnly(): void {
         const wrap = this.contentEl.querySelector('.qc-manager-table-wrap') as HTMLElement | null
         if (!wrap) return
@@ -394,7 +396,7 @@ export class ClipManagerView extends ItemView {
         const sorted = this.sortClips(clips)
         const orderedCols = this.getOrderedColumns()
 
-        const table = container.createEl('table', { cls: 'qc-table' })
+        const table = container.createEl('table', { cls: `qc-table qc-density-${this.plugin.settings.rowDensity}` })
         const thead = table.createEl('thead')
         const headerRow = thead.createEl('tr')
 
@@ -520,7 +522,8 @@ export class ClipManagerView extends ItemView {
         // Snippet — always first, linked to exact clip location
         const snippetTd = tr.createEl('td', { cls: 'qc-cell qc-cell--snippet' })
         const raw = ref.clip.text ?? this.snippetCache.get(ref.clip.hash) ?? CLIP_TYPE_LABELS[ref.clip.clip_type] ?? ref.clip.clip_type
-        const snippet = raw.length > 20 ? raw.slice(0, 20) + '…' : raw
+        const len = this.plugin.settings.snippetLength
+        const snippet = raw.length > len ? raw.slice(0, len) + '…' : raw
         const snippetLink = snippetTd.createEl('a', { cls: 'qc-snippet-link', text: snippet })
         snippetLink.title = ref.clip.text ?? raw
         snippetLink.addEventListener('click', (e) => { e.preventDefault(); this.openClip(ref) })
@@ -559,7 +562,7 @@ export class ClipManagerView extends ItemView {
                     break
                 case 'saved_at':
                     td.addClass('qc-cell--date')
-                    td.textContent = formatDate(ref.clip.savedAt)
+                    td.textContent = formatDate(ref.clip.savedAt, this.plugin.settings.dateFormat)
                     break
                 case 'tags':
                     this.renderEditableTags(td, ref)
@@ -568,11 +571,15 @@ export class ClipManagerView extends ItemView {
                     td.textContent = this.noteCache.get(ref.clip.hash) ? 'Yes' : 'No'
                     td.addClass('qc-cell--has-notes')
                     break
-                case 'path':
+                case 'path': {
                     td.addClass('qc-cell--path')
-                    td.textContent = ref.clip.path ?? ''
-                    td.title = ref.clip.path ?? ''
+                    const fullPath = ref.clip.path ?? ''
+                    td.textContent = this.plugin.settings.filePathDisplay === 'filename'
+                        ? fullPath.split('/').pop() ?? fullPath
+                        : fullPath
+                    td.title = fullPath
                     break
+                }
             }
         }
 
@@ -585,6 +592,9 @@ export class ClipManagerView extends ItemView {
         })
         deleteBtn.addEventListener('click', async (e) => {
             e.stopPropagation()
+            if (this.plugin.settings.confirmDelete) {
+                if (!window.confirm('Delete this clip? This cannot be undone.')) return
+            }
             deleteBtn.disabled = true
             deleteBtn.setText('…')
             try {
@@ -607,9 +617,10 @@ export class ClipManagerView extends ItemView {
         const tr = this.contentEl.querySelector(`tr[data-hash="${ref.clip.hash}"]`)
         if (!tr) return
         const raw = ref.clip.text ?? this.snippetCache.get(ref.clip.hash) ?? CLIP_TYPE_LABELS[ref.clip.clip_type] ?? ref.clip.clip_type
+        const len = this.plugin.settings.snippetLength
         const snippetLink = tr.querySelector('.qc-snippet-link') as HTMLElement | null
         if (snippetLink) {
-            snippetLink.textContent = raw.length > 20 ? raw.slice(0, 20) + '…' : raw
+            snippetLink.textContent = raw.length > len ? raw.slice(0, len) + '…' : raw
             snippetLink.title = ref.clip.text ?? raw
         }
         const noteCell = tr.querySelector('.qc-cell--has-notes') as HTMLElement | null
@@ -694,10 +705,25 @@ export class ClipManagerView extends ItemView {
     }
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, format: 'absolute' | 'relative' | 'full' = 'absolute'): string {
     if (!iso) return ''
     try {
-        return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: undefined })
+        const date = new Date(iso)
+        if (format === 'full')
+            return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+        if (format === 'relative') {
+            const diff = Date.now() - date.getTime()
+            const mins  = Math.floor(diff / 60_000)
+            const hours = Math.floor(diff / 3_600_000)
+            const days  = Math.floor(diff / 86_400_000)
+            if (mins  < 60)  return `${mins}m ago`
+            if (hours < 24)  return `${hours}h ago`
+            if (days  < 7)   return `${days}d ago`
+            if (days  < 30)  return `${Math.floor(days / 7)}w ago`
+            if (days  < 365) return `${Math.floor(days / 30)}mo ago`
+            return `${Math.floor(days / 365)}y ago`
+        }
+        return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: undefined })
     } catch {
         return ''
     }
