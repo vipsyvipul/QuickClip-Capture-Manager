@@ -1,6 +1,7 @@
 import { MarkdownView, Plugin } from 'obsidian'
 import { processHighlight, scanAndTransform } from './renderers/highlight'
 import { processFullPage, injectFullPageHeader } from './renderers/fullPage'
+import { injectVideoClipView } from './renderers/videoClip'
 import { ClipManagerView, VIEW_CLIP_MANAGER } from './views/ClipManagerView'
 import { QuickClipSettingTab } from './settings'
 
@@ -60,7 +61,17 @@ export default class QuickClipCapturePlugin extends Plugin {
                     const section = view.containerEl.querySelector('.markdown-preview-section')
                     if (section) scanAndTransform(section as HTMLElement)
                     injectFullPageHeader(this.app, view.containerEl, view.file?.path ?? '')
+                    injectVideoClipView(this.app, view.containerEl, view.file?.path ?? '')
                 }, 100)
+            })
+        )
+
+        // Also handle switching to Reading view within the same leaf
+        this.registerEvent(
+            this.app.workspace.on('layout-change', () => {
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView)
+                if (!view || view.getMode() !== 'preview') return
+                injectVideoClipView(this.app, view.containerEl, view.file?.path ?? '')
             })
         )
 

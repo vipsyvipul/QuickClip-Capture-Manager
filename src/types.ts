@@ -1,4 +1,4 @@
-export type ClipType = 'highlight' | 'full-page' | 'transcript' | 'tweet' | 'pdf-highlight' | 'image'
+export type ClipType = 'highlight' | 'full-page' | 'transcript' | 'tweet' | 'pdf-highlight' | 'image' | 'video-clip'
 export type ContentType = 'article' | 'video' | 'tweet' | 'pdf' | 'github'
 
 export interface Clip {
@@ -16,6 +16,8 @@ export interface Clip {
     video_id?: string
     channel?: string
     duration?: number
+    // video-clip
+    start_time?: number
     // tweet
     tweet_id?: string
     author_handle?: string
