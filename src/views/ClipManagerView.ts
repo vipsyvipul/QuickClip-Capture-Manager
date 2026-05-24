@@ -73,8 +73,9 @@ export class ClipManagerView extends ItemView {
                         this.snippetCache.delete(ref.clip.hash)
                         this.noteCache.delete(ref.clip.hash)
                     }
-                    await Promise.all(affected.map(ref => this.loadFileData(ref)))
-                    this.renderTableOnly()
+                    for (const ref of affected) {
+                        this.loadFileData(ref).then(() => this.updateClipCells(ref))
+                    }
                 }, 500)
             })
         )
@@ -95,12 +96,10 @@ export class ClipManagerView extends ItemView {
     async refresh(): Promise<void> {
         const index = await loadIndex(this.app)
         this.clips = getAllClips(index)
-        await Promise.all(
-            this.clips
-                .filter(ref => !this.noteCache.has(ref.clip.hash))
-                .map(ref => this.loadFileData(ref))
-        )
         this.render()
+        for (const ref of this.clips.filter(r => !this.noteCache.has(r.clip.hash))) {
+            this.loadFileData(ref).then(() => this.updateClipCells(ref))
+        }
     }
 
     private async loadFileData(ref: ClipRef): Promise<void> {
@@ -516,7 +515,7 @@ export class ClipManagerView extends ItemView {
     }
 
     private renderRow(tbody: HTMLElement, ref: ClipRef, orderedCols: ColumnDef[]): void {
-        const tr = tbody.createEl('tr', { cls: 'qc-row' })
+        const tr = tbody.createEl('tr', { cls: 'qc-row', attr: { 'data-hash': ref.clip.hash } })
 
         // Snippet — always first, linked to exact clip location
         const snippetTd = tr.createEl('td', { cls: 'qc-cell qc-cell--snippet' })
@@ -602,6 +601,19 @@ export class ClipManagerView extends ItemView {
                 deleteBtn.setText('✕')
             }
         })
+    }
+
+    private updateClipCells(ref: ClipRef): void {
+        const tr = this.contentEl.querySelector(`tr[data-hash="${ref.clip.hash}"]`)
+        if (!tr) return
+        const raw = ref.clip.text ?? this.snippetCache.get(ref.clip.hash) ?? CLIP_TYPE_LABELS[ref.clip.clip_type] ?? ref.clip.clip_type
+        const snippetLink = tr.querySelector('.qc-snippet-link') as HTMLElement | null
+        if (snippetLink) {
+            snippetLink.textContent = raw.length > 20 ? raw.slice(0, 20) + '…' : raw
+            snippetLink.title = ref.clip.text ?? raw
+        }
+        const noteCell = tr.querySelector('.qc-cell--has-notes') as HTMLElement | null
+        if (noteCell) noteCell.textContent = this.noteCache.get(ref.clip.hash) ? 'Yes' : 'No'
     }
 
     private renderEditableTags(td: HTMLElement, ref: ClipRef): void {

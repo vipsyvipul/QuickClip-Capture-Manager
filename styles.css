@@ -197,6 +197,7 @@
     overflow: auto;
     flex: 1;
     min-height: 0;
+    will-change: scroll-position;
 }
 
 /* ── Manager Table ──────────────────────────────────────────── */
@@ -237,7 +238,6 @@ td.qc-col-drag-after  { border-right: 2px solid var(--interactive-accent); }
 
 .qc-row {
     border-bottom: 1px solid var(--background-modifier-border);
-    transition: background 80ms;
 }
 
 .qc-row:hover {
@@ -387,19 +387,23 @@ th[data-col-key="has_notes"] {
 }
 
 .qc-delete-btn {
-    background: none;
+    background: var(--color-red);
     border: none;
-    color: var(--text-faint);
+    color: #fff;
     cursor: pointer;
     padding: 2px 6px;
     border-radius: 4px;
     font-size: var(--font-ui-small);
-    transition: background 0.1s;
+    opacity: 0;
+    transition: opacity 80ms;
+}
+
+.qc-row:hover .qc-delete-btn {
+    opacity: 0.5;
 }
 
 .qc-delete-btn:hover {
-    color: #fff;
-    background: var(--color-red);
+    opacity: 1 !important;
 }
 
 /* ── Filter Bar ─────────────────────────────────────────────── */
