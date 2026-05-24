@@ -18,7 +18,7 @@ const CLIP_TYPE_LABELS: Record<string, string> = {
 
 type SortKey = 'saved_at' | 'clip_type' | 'content_type' | 'page_title' | 'domain'
 type SortDir = 'asc' | 'desc'
-type ColumnKey = 'clip_type' | 'content_type' | 'page_title' | 'domain' | 'saved_at' | 'tags' | 'path'
+type ColumnKey = 'clip_type' | 'content_type' | 'page_title' | 'domain' | 'saved_at' | 'tags' | 'path' | 'has_notes'
 
 interface ColumnDef {
     key: ColumnKey
@@ -33,6 +33,7 @@ const ALL_COLUMNS: ColumnDef[] = [
     { key: 'domain',       label: 'Domain',       sortKey: 'domain' },
     { key: 'saved_at',     label: 'Saved',        sortKey: 'saved_at' },
     { key: 'tags',         label: 'Tags' },
+    { key: 'has_notes',    label: 'Has Note' },
     { key: 'path',         label: 'File Path' },
 ]
 
@@ -43,6 +44,7 @@ export class ClipManagerView extends ItemView {
     private sortDir: SortDir = 'desc'
     private colPickerClose: (() => void) | null = null
     private snippetCache = new Map<string, string>()
+    private noteCache = new Map<string, boolean>()
     private snippetRefreshTimer: ReturnType<typeof setTimeout> | null = null
 
     constructor(leaf: WorkspaceLeaf, plugin: QuickClipCapturePlugin) {
@@ -67,8 +69,11 @@ export class ClipManagerView extends ItemView {
                     this.snippetRefreshTimer = null
                     const affected = this.clips.filter(ref => ref.clip.path === file.path)
                     if (affected.length === 0) return
-                    for (const ref of affected) this.snippetCache.delete(ref.clip.hash)
-                    await Promise.all(affected.map(ref => this.loadSnippet(ref)))
+                    for (const ref of affected) {
+                        this.snippetCache.delete(ref.clip.hash)
+                        this.noteCache.delete(ref.clip.hash)
+                    }
+                    await Promise.all(affected.map(ref => this.loadFileData(ref)))
                     this.renderTableOnly()
                 }, 500)
             })
@@ -92,26 +97,35 @@ export class ClipManagerView extends ItemView {
         this.clips = getAllClips(index)
         await Promise.all(
             this.clips
-                .filter(ref => !ref.clip.text && !this.snippetCache.has(ref.clip.hash))
-                .map(ref => this.loadSnippet(ref))
+                .filter(ref => !this.noteCache.has(ref.clip.hash))
+                .map(ref => this.loadFileData(ref))
         )
         this.render()
     }
 
-    private async loadSnippet(ref: ClipRef): Promise<void> {
-        if (!ref.clip.path) return
+    private async loadFileData(ref: ClipRef): Promise<void> {
+        if (!ref.clip.path) {
+            this.noteCache.set(ref.clip.hash, false)
+            return
+        }
         const file = this.app.vault.getAbstractFileByPath(ref.clip.path)
-        if (!(file instanceof TFile)) return
+        if (!(file instanceof TFile)) {
+            this.noteCache.set(ref.clip.hash, false)
+            return
+        }
         const content = await this.app.vault.read(file)
 
-        let snippet = ''
         if (ref.clip.clip_type === 'full-page') {
             const bodyStart = content.indexOf('\n---\n', 4)
             const body = bodyStart !== -1 ? content.slice(bodyStart + 5) : content
-            for (const line of body.split('\n')) {
-                const t = line.replace(/^#+\s*/, '').replace(/^>\s*/, '').trim()
-                if (t && !t.startsWith('[!') && !t.startsWith('|') && !t.startsWith('!')) {
-                    snippet = t; break
+            const bodyLines = body.split('\n')
+            this.noteCache.set(ref.clip.hash, bodyLines.some(l => /^>\s*\[!note\]/i.test(l)))
+            if (!this.snippetCache.has(ref.clip.hash)) {
+                for (const line of bodyLines) {
+                    const t = line.replace(/^#+\s*/, '').replace(/^>\s*/, '').trim()
+                    if (t && !t.startsWith('[!') && !t.startsWith('|') && !t.startsWith('!')) {
+                        this.snippetCache.set(ref.clip.hash, t); break
+                    }
                 }
             }
         } else {
@@ -119,21 +133,35 @@ export class ClipManagerView extends ItemView {
             const capturedStr = `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()} \\| ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`
             const lines = content.split('\n')
             const capturedIdx = lines.findIndex(l => l.includes(`| Captured | ${capturedStr} |`))
-            if (capturedIdx !== -1) {
-                for (let i = capturedIdx - 1; i >= 0; i--) {
-                    if (lines[i].startsWith('> [!quote]')) {
-                        const quoteLines: string[] = []
-                        for (let j = i + 1; j < capturedIdx; j++) {
-                            if (lines[j].startsWith('> ') && !lines[j].startsWith('> [!'))
-                                quoteLines.push(lines[j].slice(2).trim())
-                        }
-                        snippet = quoteLines.join(' ').trim()
-                        break
-                    }
+            if (capturedIdx === -1) {
+                this.noteCache.set(ref.clip.hash, false)
+                return
+            }
+            let quoteIdx = -1
+            for (let i = capturedIdx - 1; i >= 0; i--) {
+                if (lines[i].startsWith('> [!quote]')) { quoteIdx = i; break }
+            }
+            if (quoteIdx === -1) {
+                this.noteCache.set(ref.clip.hash, false)
+                return
+            }
+            // Note is present if there's a > [!note] block immediately before > [!quote]
+            let hasNote = false
+            for (let i = quoteIdx - 1; i >= 0; i--) {
+                if (/^>\s*\[!note\]/i.test(lines[i])) { hasNote = true; break }
+                if (lines[i] !== '' && !lines[i].startsWith('>')) break
+            }
+            this.noteCache.set(ref.clip.hash, hasNote)
+            if (!this.snippetCache.has(ref.clip.hash) && !ref.clip.text) {
+                const quoteLines: string[] = []
+                for (let j = quoteIdx + 1; j < capturedIdx; j++) {
+                    if (lines[j].startsWith('> ') && !lines[j].startsWith('> [!'))
+                        quoteLines.push(lines[j].slice(2).trim())
                 }
+                const snippet = quoteLines.join(' ').trim()
+                if (snippet) this.snippetCache.set(ref.clip.hash, snippet)
             }
         }
-        if (snippet) this.snippetCache.set(ref.clip.hash, snippet)
     }
 
     private render(): void {
@@ -536,6 +564,10 @@ export class ClipManagerView extends ItemView {
                     break
                 case 'tags':
                     this.renderEditableTags(td, ref)
+                    break
+                case 'has_notes':
+                    td.textContent = this.noteCache.get(ref.clip.hash) ? 'Yes' : 'No'
+                    td.addClass('qc-cell--has-notes')
                     break
                 case 'path':
                     td.addClass('qc-cell--path')
