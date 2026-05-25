@@ -154,6 +154,11 @@ function buildCard(
     }
 
     if (viewHref) {
+        const pipeSep = document.createElement('span')
+        pipeSep.className = 'qc-footer-pipe'
+        pipeSep.textContent = '|'
+        rightGroup.appendChild(pipeSep)
+
         const deleteBtn = document.createElement('button')
         deleteBtn.className = 'qc-delete-btn qc-card-delete-btn'
         deleteBtn.textContent = '×'
