@@ -112,15 +112,17 @@
     line-height: 1;
     box-sizing: border-box;
     opacity: 0;
-    transition: opacity 80ms;
+    transition: opacity 150ms;
 }
 
 .qc-highlight-card:hover .qc-card-delete-btn {
     opacity: 0.4;
+    transition: opacity 0ms;
 }
 
 .qc-card-delete-btn:hover {
     opacity: 1 !important;
+    transition: opacity 0ms;
 }
 
 .qc-view-link {
@@ -181,6 +183,25 @@
     font-size: var(--font-ui-small);
     color: var(--text-muted);
     font-weight: 500;
+}
+
+.qc-refresh-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 3px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+    transition: opacity 150ms;
+}
+
+.qc-refresh-btn:hover {
+    opacity: 1;
+    transition: opacity 0ms;
 }
 
 .qc-manager-empty {
@@ -395,11 +416,12 @@ th[data-col-key="has_notes"] {
     border-radius: 4px;
     font-size: var(--font-ui-small);
     opacity: 0.35;
-    transition: opacity 80ms;
+    transition: opacity 150ms;
 }
 
 .qc-delete-btn:hover {
     opacity: 1;
+    transition: opacity 0ms;
 }
 
 /* ── Video Clip View ────────────────────────────────────────── */

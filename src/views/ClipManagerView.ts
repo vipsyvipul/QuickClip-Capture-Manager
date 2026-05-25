@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile, Notice } from 'obsidian'
+import { ItemView, WorkspaceLeaf, TFile, Notice, setIcon } from 'obsidian'
 import QuickClipCapturePlugin from '../main'
 import { loadIndex, getAllClips, deleteClip, updateContentType, updateClipTags } from '../clipsIndex'
 import { ClipRef, Clip, ContentType } from '../types'
@@ -177,6 +177,9 @@ export class ClipManagerView extends ItemView {
         header.createEl('h2', { text: 'QuickClip Capture' })
         const right = header.createDiv('qc-manager-header-right')
         right.createDiv('qc-manager-count')
+        const refreshBtn = right.createEl('button', { cls: 'qc-refresh-btn', attr: { title: 'Refresh' } })
+        setIcon(refreshBtn, 'refresh-cw')
+        refreshBtn.addEventListener('click', () => this.refresh())
         this.renderColumnPicker(right)
 
         if (this.clips.length === 0) {
