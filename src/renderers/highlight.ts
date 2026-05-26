@@ -3,7 +3,7 @@ import { loadIndex, deleteClip } from '../clipsIndex'
 
 export function processHighlight(app: App, el: HTMLElement, ctx: MarkdownPostProcessorContext, confirmDelete: () => boolean): void {
     if (el.closest('.cm-editor')) return
-    if (!el.querySelector('[data-callout="quote"]')) return
+    if (!el.querySelector('[data-callout="quote"], [data-callout="clip"]')) return
     ctx.addChild(new HighlightScanner(el, app, ctx.sourcePath, confirmDelete))
 }
 
@@ -26,8 +26,9 @@ class HighlightScanner extends MarkdownRenderChild {
 
 function transformSection(app: App, sourcePath: string, confirmDelete: () => boolean, calloutSection: HTMLElement): void {
     if (calloutSection.querySelector('.qc-highlight-card')) return
+    if (calloutSection.dataset.qcBuilding) return
 
-    const callout = calloutSection.querySelector<HTMLElement>('[data-callout="quote"]')
+    const callout = calloutSection.querySelector<HTMLElement>('[data-callout="quote"], [data-callout="clip"]')
     if (!callout) return
 
     const tableSection = calloutSection.nextElementSibling as HTMLElement | null
@@ -48,7 +49,7 @@ function transformSection(app: App, sourcePath: string, confirmDelete: () => boo
 
 // Called from main.ts on active-leaf-change to re-apply after Obsidian cache resets
 export function scanAndTransform(app: App, container: HTMLElement, sourcePath: string, confirmDelete: () => boolean): void {
-    const sections = Array.from(container.querySelectorAll('[data-callout="quote"]'))
+    const sections = Array.from(container.querySelectorAll('[data-callout="quote"], [data-callout="clip"]'))
     sections.forEach(callout => {
         const section = callout.closest('.el-div, .el-blockquote, div') as HTMLElement | null
         if (section && section.parentElement === container) {
@@ -59,11 +60,24 @@ export function scanAndTransform(app: App, container: HTMLElement, sourcePath: s
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
+function fmtDate(savedAt: string): string {
+    const d = new Date(savedAt)
+    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+}
+
 function safeDecode(s: string): string {
     try { return decodeURIComponent(s) } catch { return s }
 }
 
-function buildCard(
+type BadgeCfg = { cls: string; icon: string; label: string }
+const BADGE: Record<string, BadgeCfg> = {
+    'highlight':     { cls: 'qc-badge-highlight',     icon: 'highlighter', label: 'Highlight' },
+    'pdf-highlight': { cls: 'qc-badge-pdf-highlight', icon: 'file-text',   label: 'PDF' },
+    'tweet':         { cls: 'qc-badge-tweet',         icon: 'twitter',     label: 'Tweet' },
+    'image':         { cls: 'qc-badge-image',         icon: 'image',       label: 'Image' },
+}
+
+async function buildCard(
     app: App,
     sourcePath: string,
     confirmDelete: () => boolean,
@@ -72,9 +86,11 @@ function buildCard(
     callout: HTMLElement,
     table: HTMLTableElement,
     noteSection: HTMLElement | null
-): void {
+): Promise<void> {
+    calloutSection.dataset.qcBuilding = '1'
+
     const contentEl = callout.querySelector('.callout-content')
-    if (!contentEl) return
+    if (!contentEl) { delete calloutSection.dataset.qcBuilding; return }
 
     let viewHref = ''
     let sourceHref = ''
@@ -107,6 +123,24 @@ function buildCard(
             valueCell?.textContent?.split(/\s+/).filter(Boolean).forEach(t => tags.push(t))
         }
     }
+
+    // Resolve clip_type from the index
+    let clipType = isPdf ? 'pdf-highlight' : 'highlight'
+    if (captured) {
+        const index = await loadIndex(app)
+        outer: for (const entry of Object.values(index)) {
+            for (const c of entry.clips) {
+                if (fmtDate(c.savedAt) === captured && c.path === sourcePath) {
+                    clipType = c.clip_type
+                    break outer
+                }
+            }
+        }
+    }
+
+    delete calloutSection.dataset.qcBuilding
+
+    const badgeCfg = BADGE[clipType] ?? BADGE['highlight']
 
     // Quote block
     const quoteBlock = document.createElement('div')
@@ -157,12 +191,12 @@ function buildCard(
     leftGroup.className = 'qc-highlight-actions-left'
 
     const badge = document.createElement('span')
-    badge.className = `qc-clip-badge ${isPdf ? 'qc-badge-pdf-highlight' : 'qc-badge-highlight'}`
+    badge.className = `qc-clip-badge ${badgeCfg.cls}`
     const iconEl = document.createElement('span')
     iconEl.className = 'qc-badge-icon'
-    setIcon(iconEl, isPdf ? 'file-text' : 'highlighter')
+    setIcon(iconEl, badgeCfg.icon)
     badge.appendChild(iconEl)
-    badge.appendChild(document.createTextNode(isPdf ? 'PDF' : 'Highlight'))
+    badge.appendChild(document.createTextNode(badgeCfg.label))
     leftGroup.appendChild(badge)
 
     if (isPdf) {
@@ -224,11 +258,7 @@ function buildCard(
             let matchUrl = ''
             let match = null
             for (const [url, entry] of Object.entries(index)) {
-                const clip = entry.clips.find(c => {
-                    const d = new Date(c.savedAt)
-                    const fmt = `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
-                    return fmt === captured && c.path === sourcePath
-                })
+                const clip = entry.clips.find(c => fmtDate(c.savedAt) === captured && c.path === sourcePath)
                 if (clip) { matchUrl = url; match = clip; break }
             }
             if (!match) return
