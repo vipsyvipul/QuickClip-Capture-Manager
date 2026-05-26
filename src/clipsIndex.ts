@@ -3,7 +3,7 @@ import { ClipsIndex, ClipRef, Clip, ContentType } from './types'
 
 const INDEX_PATH = '.quickclip/clipsHistory.json'
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 export async function loadIndex(app: App): Promise<ClipsIndex> {
     try {
@@ -38,16 +38,22 @@ export async function deleteClip(app: App, url: string, hash: string): Promise<v
     if (!clip) return
 
     entry.clips = entry.clips.filter(c => c.hash !== hash)
-    if (entry.clips.length === 0) {
-        delete index[url]
-    }
+    const isLastClip = entry.clips.length === 0
+    if (isLastClip) delete index[url]
     await saveIndex(app, index)
 
-    const isWholeFile = clip.clip_type === 'full-page' || clip.clip_type === 'transcript' || clip.clip_type === 'tweet'
-    if (isWholeFile) {
+    if (clip.clip_type === 'full-page' || clip.clip_type === 'transcript') {
         const file = app.vault.getAbstractFileByPath(clip.path)
         if (file instanceof TFile) await app.vault.delete(file)
+    } else if (clip.clip_type === 'video-clip') {
+        if (isLastClip) {
+            const file = app.vault.getAbstractFileByPath(clip.path)
+            if (file instanceof TFile) await app.vault.delete(file)
+        } else {
+            await removeVideoClipRow(app, clip)
+        }
     } else {
+        // highlight, pdf-highlight, tweet, image — all appended callout blocks
         await removeHighlightFromFile(app, clip)
     }
 }
@@ -147,6 +153,22 @@ async function updateHighlightTags(app: App, file: TFile, clip: Clip, tags: stri
     await app.vault.modify(file, newLines.join('\n'))
 }
 
+async function removeVideoClipRow(app: App, clip: Clip): Promise<void> {
+    const file = app.vault.getAbstractFileByPath(clip.path)
+    if (!(file instanceof TFile)) return
+
+    const content = await app.vault.read(file)
+    const date = new Date(clip.savedAt)
+    // Match the "Clip Timeline" column value: "DD Mon YYYY \| HH:MM"
+    const dateStr = `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()} \\| ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`
+
+    const lines = content.split('\n')
+    const rowIdx = lines.findIndex(l => l.includes(`| ${dateStr} |`))
+    if (rowIdx === -1) return
+
+    await app.vault.modify(file, lines.filter((_, i) => i !== rowIdx).join('\n'))
+}
+
 async function removeHighlightFromFile(app: App, clip: Clip): Promise<void> {
     const file = app.vault.getAbstractFileByPath(clip.path)
     if (!(file instanceof TFile)) return
@@ -165,7 +187,7 @@ async function removeHighlightFromFile(app: App, clip: Clip): Promise<void> {
     // Walk backwards to find the > [!quote] Clip line
     let blockStart = capturedLineIdx
     for (let i = capturedLineIdx - 1; i >= 0; i--) {
-        if (lines[i].startsWith('> [!quote]')) {
+        if (lines[i].startsWith('> [!quote]') || lines[i].startsWith('> [!clip]')) {
             blockStart = i
             break
         }

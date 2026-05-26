@@ -58,7 +58,7 @@ export function scanAndTransform(app: App, container: HTMLElement, sourcePath: s
     })
 }
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 function fmtDate(savedAt: string): string {
     const d = new Date(savedAt)

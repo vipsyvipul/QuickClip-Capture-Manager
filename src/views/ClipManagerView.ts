@@ -5,7 +5,7 @@ import { ClipRef, Clip, ContentType } from '../types'
 
 export const VIEW_CLIP_MANAGER = 'quickclip-manager'
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 const CLIP_TYPE_LABELS: Record<string, string> = {
     'highlight':     'Highlight',
