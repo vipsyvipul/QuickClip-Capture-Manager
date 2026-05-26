@@ -9,7 +9,7 @@ export function injectVideoClipView(app: App, containerEl: HTMLElement, filePath
     if (!(tfile instanceof TFile)) return
 
     const frontmatter = app.metadataCache.getFileCache(tfile)?.frontmatter
-    if (frontmatter?.clipType !== 'video-clip') return
+    if (frontmatter?.['clip_type'] !== 'video-clip') return
 
     const url: string = frontmatter.url
     if (!url) return
@@ -19,7 +19,7 @@ export function injectVideoClipView(app: App, containerEl: HTMLElement, filePath
     if (section.querySelector('.qc-video-wrap')) return // already injected
 
     const table = Array.from(section.querySelectorAll('table')).find(
-        t => t.querySelector('th')?.textContent?.trim().toLowerCase() === 'start'
+        t => t.querySelector('th')?.textContent?.trim().toLowerCase() === 'time'
     )
     if (!table) return
 
@@ -91,32 +91,36 @@ function transformTable(
     const headers = Array.from(table.querySelectorAll('th')).map(
         th => th.textContent?.trim().toLowerCase() ?? ''
     )
-    const startIdx = headers.indexOf('start')
-    const savedIdx = headers.indexOf('saved')
-    const tagsIdx  = headers.indexOf('tags')
+    const timeIdx     = headers.indexOf('time')
+    const timelineIdx = headers.indexOf('clip timeline')
+    const tagsIdx     = headers.indexOf('tags')
 
     for (const row of Array.from(table.querySelectorAll('tbody tr'))) {
         const cells = Array.from(row.querySelectorAll('td'))
 
-        if (startIdx >= 0 && cells[startIdx]) {
-            const seconds = parseInt(cells[startIdx].textContent?.trim() ?? '', 10)
-            if (!isNaN(seconds)) {
-                cells[startIdx].empty()
-                const chip = cells[startIdx].createEl('span', {
+        if (timeIdx >= 0 && cells[timeIdx]) {
+            const link = cells[timeIdx].querySelector('a')
+            const seconds = link ? extractSeconds(link.href, platform) : NaN
+            const label = link?.textContent?.trim() ?? ''
+            cells[timeIdx].empty()
+            if (!isNaN(seconds) && (iframe || fallbackUrl)) {
+                const chip = cells[timeIdx].createEl('span', {
                     cls: 'qc-timestamp-chip',
-                    text: `▶ ${formatSeconds(seconds)}`,
+                    text: `▶ ${label}`,
                     attr: { title: 'Jump to this moment' },
                 })
                 chip.addEventListener('click', () => {
                     if (iframe && platform) seekVideo(iframe, platform, seconds)
                     else if (fallbackUrl) window.open(fallbackUrl, '_blank')
                 })
+            } else if (link) {
+                cells[timeIdx].appendChild(link.cloneNode(true))
             }
         }
 
-        if (savedIdx >= 0 && cells[savedIdx]) {
-            const iso = cells[savedIdx].textContent?.trim() ?? ''
-            if (iso) cells[savedIdx].textContent = formatDate(iso)
+        if (timelineIdx >= 0 && cells[timelineIdx]) {
+            const raw = cells[timelineIdx].textContent?.trim() ?? ''
+            if (raw) cells[timelineIdx].textContent = formatClipDate(raw)
         }
 
         if (tagsIdx >= 0 && cells[tagsIdx]) {
@@ -176,6 +180,18 @@ function youtubeErrorText(code: number): { title: string; sub: string } {
     }
 }
 
+function extractSeconds(href: string, platform: KnownPlatform | null): number {
+    try {
+        if (platform === 'vimeo') {
+            const m = href.match(/#t=(\d+)s?/)
+            return m ? parseInt(m[1], 10) : NaN
+        }
+        // YouTube: &t=N
+        const t = new URL(href).searchParams.get('t')
+        return t ? parseInt(t, 10) : NaN
+    } catch { return NaN }
+}
+
 function safeHostname(url: string): string {
     try { return new URL(url).hostname } catch { return url }
 }
@@ -188,8 +204,10 @@ function formatSeconds(s: number): string {
     return `${m}:${String(sec).padStart(2, '0')}`
 }
 
-function formatDate(iso: string): string {
-    const d = new Date(iso)
-    if (isNaN(d.getTime())) return iso
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+// Clip Timeline cell contains "26 May 2026 | 15:30" — reformat to "26 May · 15:30"
+function formatClipDate(raw: string): string {
+    const m = raw.match(/(\d{1,2}\s+\w+\s+\d{4})\s*\|\s*(\d{2}:\d{2})/)
+    if (!m) return raw
+    const parts = m[1].split(/\s+/)
+    return `${parts[0]} ${parts[1]} · ${m[2]}`
 }
