@@ -415,13 +415,15 @@ td.qc-col-drag-after  { border-right: 2px solid var(--interactive-accent); }
 .qc-density-compact  .qc-row td { padding: 3px 8px; }
 .qc-density-spacious .qc-row td { padding: 13px 10px; }
 
-.qc-snippet-link {
+.qc-snippet-link,
+.qc-cell-link {
     color: var(--text-normal);
     text-decoration: none;
     cursor: pointer;
 }
 
-.qc-snippet-link:hover {
+.qc-snippet-link:hover,
+.qc-cell-link:hover {
     color: var(--text-accent);
     text-decoration: underline;
 }

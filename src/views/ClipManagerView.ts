@@ -705,11 +705,13 @@ export class ClipManagerView extends ItemView {
                     })
                     break
                 }
-                case 'page_title':
+                case 'page_title': {
                     td.addClass('qc-cell--title')
-                    td.textContent = ref.pageTitle ?? ''
-                    td.title = ref.pageTitle ?? ''
+                    const titleLink = td.createEl('a', { cls: 'qc-cell-link', text: ref.pageTitle ?? '' })
+                    titleLink.title = ref.pageTitle ?? ''
+                    titleLink.addEventListener('click', (e) => { e.preventDefault(); this.openClip(ref) })
                     break
+                }
                 case 'domain':
                     if (ref.domain) td.createSpan({ cls: 'qc-domain-chip', text: ref.domain.replace(/^www\./, '') })
                     break
@@ -730,10 +732,12 @@ export class ClipManagerView extends ItemView {
                 case 'path': {
                     td.addClass('qc-cell--path')
                     const fullPath = ref.clip.path ?? ''
-                    td.textContent = this.plugin.settings.filePathDisplay === 'filename'
+                    const displayPath = this.plugin.settings.filePathDisplay === 'filename'
                         ? fullPath.split('/').pop() ?? fullPath
                         : fullPath
-                    td.title = fullPath
+                    const pathLink = td.createEl('a', { cls: 'qc-cell-link', text: displayPath })
+                    pathLink.title = fullPath
+                    pathLink.addEventListener('click', (e) => { e.preventDefault(); this.openClip(ref) })
                     break
                 }
             }
