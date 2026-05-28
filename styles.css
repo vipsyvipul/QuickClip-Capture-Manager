@@ -575,7 +575,7 @@ th[data-col-key="has_notes"] {
     border: none;
     border-radius: 99px;
     cursor: pointer;
-    font-size: 0.8em;
+    font-size: inherit;
     font-weight: 500;
     padding: 3px 20px 3px 8px;
     outline: none;
