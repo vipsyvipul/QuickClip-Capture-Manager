@@ -263,7 +263,7 @@ export class ClipManagerView extends ItemView {
                 href: 'https://chromewebstore.google.com/detail/quickclip/edabdpgppnhbogfpdghjekdalmipflel',
                 cls: 'external-link',
             })
-            emptyEl.appendText(' extension for Chrome browser and start saving.')
+            emptyEl.appendText(' extension for Chrome browser and start clipping.')
             return
         }
 
