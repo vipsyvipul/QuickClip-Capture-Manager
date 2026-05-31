@@ -127,6 +127,7 @@ export class ClipManagerView extends ItemView {
     }
 
     async refresh(): Promise<void> {
+        invalidateIndexCache()
         const index = await loadIndex(this.app)
         this.clips = getAllClips(index)
         this.render()
@@ -250,7 +251,7 @@ export class ClipManagerView extends ItemView {
         header.createEl('h2', { text: 'QuickClip Capture' })
         const right = header.createDiv('qc-manager-header-right')
         right.createDiv('qc-manager-count')
-        const refreshBtn = right.createEl('button', { cls: 'qc-refresh-btn', attr: { title: 'Refresh' } })
+        const refreshBtn = right.createEl('button', { cls: 'qc-refresh-btn', attr: { title: 'Refresh', 'aria-label': 'Refresh' } })
         setIcon(refreshBtn, 'refresh-cw')
         refreshBtn.addEventListener('click', () => this.refresh())
         this.renderColumnPicker(right)

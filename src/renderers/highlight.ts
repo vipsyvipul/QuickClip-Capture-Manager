@@ -1,5 +1,5 @@
 import { App, MarkdownPostProcessorContext, MarkdownRenderChild, MarkdownRenderer, setIcon } from 'obsidian'
-import { loadIndex, deleteClip } from '../clipsIndex'
+import { loadIndex, deleteClip, invalidateIndexCache } from '../clipsIndex'
 
 export function processHighlight(app: App, el: HTMLElement, ctx: MarkdownPostProcessorContext, confirmDelete: () => boolean): void {
     if (el.closest('.cm-editor')) return
@@ -135,6 +135,22 @@ async function buildCard(
                     clipType = c.clip_type
                     clipUrl = url
                     break outer
+                }
+            }
+        }
+        // If not found, the cache was populated before clipsHistory.json was updated
+        // (extension writes .md then clipsHistory.json — re-render fires on the .md write).
+        // Invalidate and retry once with a fresh read.
+        if (!clipUrl) {
+            invalidateIndexCache()
+            const fresh = await loadIndex(app)
+            retry: for (const [url, entry] of Object.entries(fresh)) {
+                for (const c of entry.clips) {
+                    if (fmtDate(c.savedAt) === captured && c.path === sourcePath) {
+                        clipType = c.clip_type
+                        clipUrl = url
+                        break retry
+                    }
                 }
             }
         }
@@ -301,22 +317,36 @@ async function buildCard(
 
             card.appendChild(cloned)
         }
-        noteSection.style.display = 'none'
     }
 
+    let tweetEmbedEl: HTMLElement | null = null
     if (clipType === 'tweet' && clipUrl) {
-        const embedEl = document.createElement('div')
-        embedEl.className = 'qc-tweet-embed'
-        const embedComponent = new MarkdownRenderChild(embedEl)
-        await MarkdownRenderer.render(app, `![](${clipUrl})`, embedEl, sourcePath, embedComponent)
-        card.appendChild(embedEl)
+        // Placeholder appended now; embed rendered after card is in the live DOM
+        // so Obsidian's embed provider can initialize correctly.
+        tweetEmbedEl = document.createElement('div')
+        tweetEmbedEl.className = 'qc-tweet-embed'
+        card.appendChild(tweetEmbedEl)
     } else {
         card.appendChild(quoteBlock)
     }
     card.appendChild(footer)
 
+    // Save scroll position before any DOM mutations so the browser's scroll
+    // anchor algorithm can't snap the view when content height changes.
+    const scrollEl = calloutSection.closest('.markdown-preview-view') as HTMLElement | null
+    const savedScrollTop = scrollEl?.scrollTop
+
     calloutSection.innerHTML = ''
     calloutSection.appendChild(card)
     tableSection.classList.add('qc-table-hidden')
     tableSection.style.display = 'none'
+    if (noteSection) noteSection.style.display = 'none'
+
+    if (scrollEl && savedScrollTop !== undefined) scrollEl.scrollTop = savedScrollTop
+
+    // Render tweet embed now that embedEl is attached to the live DOM
+    if (tweetEmbedEl && clipUrl) {
+        const embedComponent = new MarkdownRenderChild(tweetEmbedEl)
+        await MarkdownRenderer.render(app, `![](${clipUrl})`, tweetEmbedEl, sourcePath, embedComponent)
+    }
 }
