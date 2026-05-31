@@ -252,7 +252,7 @@ async function buildCard(
         const link = document.createElement('a')
         link.href = viewHref
         link.className = 'qc-view-link external-link'
-        link.textContent = 'View at source ↗'
+        link.textContent = clipType === 'tweet' ? 'View tweet ↗' : 'View with highlight ↗'
         link.target = '_blank'
         link.rel = 'noopener'
         leftGroup.appendChild(link)
@@ -508,7 +508,8 @@ async function buildCardV2(
     } else if (viewHref) {
         const link = document.createElement('a')
         link.href = viewHref; link.className = 'qc-view-link external-link'
-        link.textContent = 'View at source ↗'; link.target = '_blank'; link.rel = 'noopener'
+        link.textContent = clipType === 'tweet' ? 'View tweet ↗' : 'View with highlight ↗'
+        link.target = '_blank'; link.rel = 'noopener'
         leftGroup.appendChild(link)
     }
     actionsEl.appendChild(leftGroup)
