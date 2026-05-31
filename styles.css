@@ -921,6 +921,75 @@ th[data-col-key="has_notes"] {
     white-space: nowrap;
 }
 
+/* ── Callout Colors collapsible section ──────────────────────────────────── */
+
+.qc-colors-details { outline: none; }
+
+.qc-colors-summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 18px 0 6px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    outline: none;
+}
+
+.qc-colors-summary::-webkit-details-marker { display: none; }
+
+.qc-colors-summary::before {
+    content: '▶';
+    font-size: 10px;
+    color: var(--text-muted);
+    transition: transform 150ms ease;
+    display: inline-block;
+}
+
+.qc-colors-details[open] .qc-colors-summary::before {
+    transform: rotate(90deg);
+}
+
+.qc-color-input {
+    width: 32px;
+    height: 26px;
+    padding: 2px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+}
+
+.qc-color-row-reset {
+    all: unset;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 0 4px;
+    display: inline-flex;
+    align-items: center;
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.qc-color-row-reset:hover {
+    color: var(--text-normal);
+}
+
+.qc-color-row-reset svg {
+    width: 15px;
+    height: 15px;
+    stroke-width: 3;
+}
+
+.qc-colors-details .setting-item:last-child {
+    justify-content: center;
+}
+
+.qc-colors-details .setting-item:last-child .setting-item-info {
+    display: none;
+}
+
 /* ── QuickClip callout type colors and icons ──────────────────────────────── */
 
 .callout[data-callout="qc_highlight"] { --callout-icon: highlighter; }

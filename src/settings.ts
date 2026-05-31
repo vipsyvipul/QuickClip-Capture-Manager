@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, TFile } from 'obsidian'
+import { App, PluginSettingTab, Setting, TFile, setIcon } from 'obsidian'
 import QuickClipCapturePlugin, { DEFAULT_CALLOUT_COLORS } from './main'
 import { VIEW_CLIP_MANAGER } from './views/ClipManagerView'
 import { migrateOldFormatClips, hasOldFormatClips, MigrationClipResult } from './migration'
@@ -21,7 +21,7 @@ export class QuickClipSettingTab extends PluginSettingTab {
         const { containerEl } = this
         containerEl.empty()
 
-        containerEl.createEl('h3', { text: 'Clip Manager' })
+        containerEl.createEl('h3', { text: 'Capture Settings' })
 
         new Setting(containerEl)
             .setName('Auto-open on startup')
@@ -85,8 +85,6 @@ export class QuickClipSettingTab extends PluginSettingTab {
                     this.rerenderView()
                 }))
 
-        containerEl.createEl('h3', { text: 'Editing' })
-
         new Setting(containerEl)
             .setName('Confirm before delete')
             .setDesc('Show a confirmation prompt before deleting a clip.')
@@ -97,34 +95,60 @@ export class QuickClipSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings()
                 }))
 
-        containerEl.createEl('h3', { text: 'Callout Colors' })
-        containerEl.createEl('p', {
-            text: 'Accent color for each clip type in editing and reading view.',
-            cls: 'setting-item-description',
-        })
+        // ── Callout Colors (collapsible) ─────────────────────────────────────
+        const details = containerEl.createEl('details', { cls: 'qc-colors-details' })
+        const summary = details.createEl('summary', { cls: 'qc-colors-summary' })
+        const summaryH3 = summary.createEl('h3', { text: 'Callout Colors' })
+        summaryH3.style.margin = '0'
+
+        const colorInputs: Record<string, HTMLInputElement> = {}
+        const colorResetUpdaters: Array<() => void> = []
 
         for (const { key, label } of CALLOUT_COLOR_ROWS) {
-            const setting = new Setting(containerEl).setName(label)
-            const input = setting.controlEl.createEl('input', { type: 'color' })
+            const s = new Setting(details).setName(label)
+            const input = s.controlEl.createEl('input', { type: 'color', cls: 'qc-color-input' })
             input.value = this.plugin.settings.calloutColors[key] ?? DEFAULT_CALLOUT_COLORS[key]
+            colorInputs[key] = input
+
+            // Per-row reset — visible only when color differs from default
+            const rowReset = s.controlEl.createEl('button', { cls: 'qc-color-row-reset' })
+            setIcon(rowReset, 'rotate-ccw')
+            rowReset.title = `Reset ${label} to default`
+            const updateRowReset = () => {
+                rowReset.style.display =
+                    this.plugin.settings.calloutColors[key] !== DEFAULT_CALLOUT_COLORS[key] ? '' : 'none'
+            }
+            updateRowReset()
+            colorResetUpdaters.push(updateRowReset)
             input.addEventListener('input', async () => {
                 this.plugin.settings.calloutColors[key] = input.value
                 await this.plugin.saveSettings()
                 this.plugin.injectCalloutColors()
+                updateRowReset()
+            })
+            rowReset.addEventListener('click', async () => {
+                this.plugin.settings.calloutColors[key] = DEFAULT_CALLOUT_COLORS[key]
+                input.value = DEFAULT_CALLOUT_COLORS[key]
+                await this.plugin.saveSettings()
+                this.plugin.injectCalloutColors()
+                updateRowReset()
             })
         }
 
-        new Setting(containerEl)
+        new Setting(details)
             .addButton(b => b
-                .setButtonText('Reset to defaults')
+                .setButtonText('Reset all to defaults')
                 .onClick(async () => {
                     this.plugin.settings.calloutColors = { ...DEFAULT_CALLOUT_COLORS }
                     await this.plugin.saveSettings()
                     this.plugin.injectCalloutColors()
-                    this.display()
+                    CALLOUT_COLOR_ROWS.forEach(({ key }) => {
+                        if (colorInputs[key]) colorInputs[key].value = DEFAULT_CALLOUT_COLORS[key]
+                    })
+                    colorResetUpdaters.forEach(fn => fn())
                 }))
 
-        // Entire migration section — hidden until we confirm old clips exist
+        // ── Migration (hidden until old clips detected) ──────────────────────
         const migrateSection = containerEl.createDiv()
         migrateSection.style.display = 'none'
 
@@ -140,7 +164,6 @@ export class QuickClipSettingTab extends PluginSettingTab {
         const stored = this.plugin.settings.lastMigrationReport
 
         if (!(stored && this.nothingToMigrate(stored))) {
-            // No confirmed-clean result — scan to check
             hasOldFormatClips(this.app).then(hasOld => {
                 if (hasOld) migrateSection.style.display = ''
             })
@@ -178,7 +201,6 @@ export class QuickClipSettingTab extends PluginSettingTab {
             statusEl.empty()
             this.renderMigrationResults(statusEl, result)
 
-            // Hide entire section if nothing left; re-enable button if errors remain
             if (this.nothingToMigrate(result)) {
                 migrateSection.style.display = 'none'
             } else {
