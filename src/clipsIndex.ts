@@ -146,6 +146,39 @@ async function updateHighlightTags(app: App, file: TFile, clip: Clip, tags: stri
     const content = await app.vault.read(file)
     const lines = content.split('\n')
 
+    const tagsStr = tags.length ? tags.map(t => t.startsWith('#') ? t : `#${t}`).join(' ') : null
+
+    // New format: find by hash anchor; tags row is `> > | Tags | ... |`
+    if (clip.hash) {
+        const hashLineIdx = lines.findIndex(l => l.includes(`| QuickClip Hash | ${clip.hash} |`))
+        if (hashLineIdx !== -1) {
+            let blockEnd = lines.length
+            for (let i = hashLineIdx + 1; i < lines.length; i++) {
+                if (lines[i] === '---') { blockEnd = i; break }
+            }
+            // Tags row sits between Captured and Hash in the details table — search from details opener
+            let detailsIdx = -1
+            for (let i = hashLineIdx - 1; i >= 0; i--) {
+                if (/^> > \[!qc_details\]/.test(lines[i])) { detailsIdx = i; break }
+            }
+            const searchFrom = detailsIdx !== -1 ? detailsIdx : Math.max(0, hashLineIdx - 20)
+            const tagsRowIdx = lines.findIndex((l, i) => i > searchFrom && i < hashLineIdx && l.startsWith('> > | Tags |'))
+            const newTagsLine = tagsStr ? `> > | Tags | ${tagsStr} |` : null
+            let newLines: string[]
+            if (tagsRowIdx !== -1) {
+                if (newTagsLine) { newLines = [...lines]; newLines[tagsRowIdx] = newTagsLine }
+                else              newLines = lines.filter((_, i) => i !== tagsRowIdx)
+            } else if (newTagsLine) {
+                newLines = [...lines.slice(0, hashLineIdx), newTagsLine, ...lines.slice(hashLineIdx)]
+            } else {
+                return
+            }
+            await app.vault.modify(file, newLines.join('\n'))
+            return
+        }
+    }
+
+    // Old format: find by captured date anchor; tags row is `| Tags | ... |`
     const date = new Date(clip.savedAt)
     const capturedStr = `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()} \\| ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`
     const capturedIdx = lines.findIndex(l => l.includes(`| Captured | ${capturedStr} |`))
@@ -157,17 +190,12 @@ async function updateHighlightTags(app: App, file: TFile, clip: Clip, tags: stri
     }
 
     const tagsIdx = lines.findIndex((l, i) => i > capturedIdx && i < blockEnd && l.startsWith('| Tags |'))
-    const tagsLine = tags.length
-        ? `| Tags | ${tags.map(t => t.startsWith('#') ? t : `#${t}`).join(' ')} |`
-        : null
+    const tagsLine = tagsStr ? `| Tags | ${tagsStr} |` : null
 
     let newLines: string[]
     if (tagsIdx !== -1) {
-        if (tagsLine) {
-            newLines = [...lines]; newLines[tagsIdx] = tagsLine
-        } else {
-            newLines = lines.filter((_, i) => i !== tagsIdx)
-        }
+        if (tagsLine) { newLines = [...lines]; newLines[tagsIdx] = tagsLine }
+        else           newLines = lines.filter((_, i) => i !== tagsIdx)
     } else if (tagsLine) {
         newLines = [...lines.slice(0, capturedIdx + 1), tagsLine, ...lines.slice(capturedIdx + 1)]
     } else {
@@ -213,17 +241,41 @@ async function removeHighlightFromFile(app: App, clip: Clip): Promise<void> {
     if (!(file instanceof TFile)) return
 
     const content = await app.vault.read(file)
+    const lines = content.split('\n')
+
+    // New format: find by hash anchor
+    if (clip.hash) {
+        const hashLineIdx = lines.findIndex(l => l.includes(`| QuickClip Hash | ${clip.hash} |`))
+        if (hashLineIdx !== -1) {
+            let blockStart = hashLineIdx
+            for (let i = hashLineIdx - 1; i >= 0; i--) {
+                if (/^> \[!qc_/.test(lines[i])) { blockStart = i; break }
+            }
+            let blockEnd = hashLineIdx
+            for (let i = hashLineIdx + 1; i < lines.length; i++) {
+                if (lines[i] === '---') {
+                    blockEnd = i + 1
+                    if (i + 1 < lines.length && lines[i + 1] === '') blockEnd = i + 2
+                    break
+                }
+            }
+            const startWithBlank = blockStart > 0 && lines[blockStart - 1] === '' ? blockStart - 1 : blockStart
+            const afterRemoval = [...lines.slice(0, startWithBlank), ...lines.slice(blockEnd)].join('\n')
+            await app.vault.modify(file, removeOrphanedHeadings(afterRemoval))
+            return
+        }
+    }
+
+    // Old format: find by captured date anchor
     const date = new Date(clip.savedAt)
     const capturedStr = `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()} \\| ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`
     const capturedMarker = `| Captured | ${capturedStr} |`
 
     if (!content.includes(capturedMarker)) return
 
-    const lines = content.split('\n')
     const capturedLineIdx = lines.findIndex(l => l.includes(capturedMarker))
     if (capturedLineIdx === -1) return
 
-    // Walk backwards to find the > [!quote] Clip line
     let blockStart = capturedLineIdx
     for (let i = capturedLineIdx - 1; i >= 0; i--) {
         if (lines[i].startsWith('> [!quote]') || lines[i].startsWith('> [!clip]')) {
@@ -232,9 +284,7 @@ async function removeHighlightFromFile(app: App, clip: Clip): Promise<void> {
         }
     }
 
-    // Include optional > [!note] block immediately before the callout
     if (blockStart > 0 && lines[blockStart - 1].startsWith('> ') || lines[blockStart - 1] === '') {
-        // walk back further to catch note block
         for (let i = blockStart - 1; i >= 0; i--) {
             if (lines[i].startsWith('> [!note]')) {
                 blockStart = i
@@ -244,25 +294,17 @@ async function removeHighlightFromFile(app: App, clip: Clip): Promise<void> {
         }
     }
 
-    // Walk forwards to find the --- separator
     let blockEnd = capturedLineIdx
     for (let i = capturedLineIdx + 1; i < lines.length; i++) {
         if (lines[i] === '---') {
             blockEnd = i + 1
-            // consume the blank line after ---
             if (i + 1 < lines.length && lines[i + 1] === '') blockEnd = i + 2
             break
         }
     }
 
-    // Also consume the blank line before the block
     const startWithBlank = blockStart > 0 && lines[blockStart - 1] === '' ? blockStart - 1 : blockStart
-
-    const afterRemoval = [
-        ...lines.slice(0, startWithBlank),
-        ...lines.slice(blockEnd),
-    ].join('\n')
-
+    const afterRemoval = [...lines.slice(0, startWithBlank), ...lines.slice(blockEnd)].join('\n')
     await app.vault.modify(file, removeOrphanedHeadings(afterRemoval))
 }
 
@@ -302,6 +344,54 @@ async function updateHighlightNote(app: App, file: TFile, clip: Clip, noteText: 
     const content = await app.vault.read(file)
     const lines = content.split('\n')
 
+    // New format: note is `> > [!qc_note]- Note` nested inside the parent callout
+    if (clip.hash) {
+        const hashLineIdx = lines.findIndex(l => l.includes(`| QuickClip Hash | ${clip.hash} |`))
+        if (hashLineIdx !== -1) {
+            // Find parent callout opener
+            let parentIdx = -1
+            for (let i = hashLineIdx - 1; i >= 0; i--) {
+                if (/^> \[!qc_/.test(lines[i])) { parentIdx = i; break }
+            }
+            if (parentIdx === -1) return
+
+            // Find > > [!qc_details] opener (note must come before it)
+            const detailsIdx = lines.findIndex((l, i) => i > parentIdx && i < hashLineIdx && /^> > \[!qc_details\]/.test(l))
+
+            // Find existing > > [!qc_note] block between parent and details
+            const noteLineIdx = lines.findIndex((l, i) => i > parentIdx && i < (detailsIdx !== -1 ? detailsIdx : hashLineIdx) && /^> > \[!qc_note\]/.test(l))
+
+            if (noteText) {
+                const newNoteLines = [
+                    '> > [!qc_note]- Note',
+                    ...noteText.split('\n').map(l => `> > ${l}`),
+                    '>'
+                ]
+                if (noteLineIdx !== -1) {
+                    // Replace existing note block: walk forward through > > lines + trailing >
+                    let noteEnd = noteLineIdx + 1
+                    while (noteEnd < lines.length && lines[noteEnd].startsWith('> > ')) noteEnd++
+                    if (noteEnd < lines.length && lines[noteEnd] === '>') noteEnd++
+                    lines.splice(noteLineIdx, noteEnd - noteLineIdx, ...newNoteLines)
+                } else {
+                    // Insert before > > [!qc_details]
+                    const insertAt = detailsIdx !== -1 ? detailsIdx : hashLineIdx
+                    lines.splice(insertAt, 0, ...newNoteLines)
+                }
+            } else if (noteLineIdx !== -1) {
+                // Remove existing note block
+                let noteEnd = noteLineIdx + 1
+                while (noteEnd < lines.length && lines[noteEnd].startsWith('> > ')) noteEnd++
+                if (noteEnd < lines.length && lines[noteEnd] === '>') noteEnd++
+                lines.splice(noteLineIdx, noteEnd - noteLineIdx)
+            }
+
+            await app.vault.modify(file, lines.join('\n'))
+            return
+        }
+    }
+
+    // Old format: note is `> [!note]` block before `> [!quote]`
     const date = new Date(clip.savedAt)
     const capturedStr = `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()} \\| ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`
     const capturedIdx = lines.findIndex(l => l.includes(`| Captured | ${capturedStr} |`))
@@ -313,7 +403,6 @@ async function updateHighlightNote(app: App, file: TFile, clip: Clip, noteText: 
     }
     if (quoteIdx === -1) return
 
-    // Find [!note] block immediately before [!quote]
     let noteBlockStart = -1
     let i = quoteIdx - 1
     while (i >= 0 && lines[i] === '') i--
