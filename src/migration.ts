@@ -48,6 +48,15 @@ function clipPreview(lines: string[], max = 50): string {
     return s.length > max ? s.slice(0, max).trimEnd() + '…' : s
 }
 
+// Parse a markdown table row, correctly handling \| escaped pipes inside cells
+function parseTableRow(line: string): [string, string] | null {
+    // Replace escaped pipes with a placeholder so split only hits real column separators
+    const unescaped = line.replace(/\\\|/g, '\x00')
+    const cells = unescaped.split('|').map(c => c.trim().replace(/\x00/g, '\\|')).filter(Boolean)
+    if (cells.length < 2 || cells[0] === '---') return null
+    return [cells[0], cells[1]]
+}
+
 // ─── Old-block detection ─────────────────────────────────────────────────────
 
 type OldBlock = {
@@ -105,12 +114,8 @@ function findOldBlocks(lines: string[]): OldBlock[] {
 
         const tableRows = new Map<string, string>()
         while (j < lines.length && lines[j].startsWith('|')) {
-            const parts = lines[j].split(' | ')
-            if (parts.length >= 3) {
-                const key = parts[1].trim()
-                const val = parts.slice(2).join(' | ').replace(/\s*\|$/, '').trim()
-                if (key && key !== '---') tableRows.set(key, val)
-            }
+            const parsed = parseTableRow(lines[j])
+            if (parsed) tableRows.set(parsed[0], parsed[1])
             j++
         }
 
