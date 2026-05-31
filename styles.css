@@ -843,3 +843,80 @@ th[data-col-key="has_notes"] {
 .qc-col-picker-item:hover {
     background: var(--background-modifier-hover);
 }
+
+/* ── Migration ───────────────────────────────────────────────── */
+
+.qc-migrate-status {
+    margin-top: 12px;
+}
+
+.qc-migrate-running {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.qc-migrate-summary {
+    color: var(--color-green);
+    font-weight: 500;
+}
+
+.qc-migrate-error {
+    color: var(--color-red);
+}
+
+.qc-migrate-issues-heading {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    margin: 8px 0 4px;
+}
+
+.qc-migrate-issues {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.qc-migrate-issue {
+    font-size: var(--font-ui-small);
+    padding: 6px 10px;
+    border-radius: 4px;
+    border-left: 3px solid;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px;
+    background: var(--background-secondary);
+}
+
+.qc-migrate-issue--error {
+    border-color: var(--color-red);
+}
+
+.qc-migrate-issue--warning {
+    border-color: var(--color-orange);
+}
+
+.qc-migrate-issue-tag {
+    font-weight: 600;
+    min-width: 70px;
+}
+
+.qc-migrate-issue--error .qc-migrate-issue-tag { color: var(--color-red); }
+.qc-migrate-issue--warning .qc-migrate-issue-tag { color: var(--color-orange); }
+
+.qc-migrate-issue-preview {
+    color: var(--text-normal);
+    font-style: italic;
+}
+
+.qc-migrate-issue-reason {
+    color: var(--text-muted);
+}
+
+.qc-migrate-issue-link {
+    margin-left: auto;
+    white-space: nowrap;
+}

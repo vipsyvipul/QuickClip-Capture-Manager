@@ -1,6 +1,7 @@
-import { App, PluginSettingTab, Setting } from 'obsidian'
+import { App, PluginSettingTab, Setting, TFile } from 'obsidian'
 import QuickClipCapturePlugin from './main'
 import { VIEW_CLIP_MANAGER } from './views/ClipManagerView'
+import { migrateOldFormatClips, MigrationClipResult } from './migration'
 
 export class QuickClipSettingTab extends PluginSettingTab {
     constructor(app: App, private plugin: QuickClipCapturePlugin) {
@@ -86,6 +87,77 @@ export class QuickClipSettingTab extends PluginSettingTab {
                     this.plugin.settings.confirmDelete = val
                     await this.plugin.saveSettings()
                 }))
+
+        containerEl.createEl('h3', { text: 'Migration' })
+        containerEl.createEl('p', {
+            text: 'Convert clips saved in the old [!quote] format to the new qc_* nested callout format. Clips already in the new format are skipped. This cannot be undone — back up your vault first.',
+            cls: 'setting-item-description',
+        })
+
+        const migrateBtn = containerEl.createEl('button', { text: 'Migrate clips to new format', cls: 'mod-cta' })
+        const statusEl   = containerEl.createDiv({ cls: 'qc-migrate-status' })
+
+        migrateBtn.addEventListener('click', async () => {
+            migrateBtn.disabled = true
+            migrateBtn.setText('Migrating…')
+            statusEl.empty()
+            statusEl.createEl('p', {
+                text: '⏳ Migration in progress — do not close Obsidian until this is complete.',
+                cls: 'qc-migrate-running',
+            })
+
+            let report
+            try {
+                report = await migrateOldFormatClips(this.app)
+            } catch (err) {
+                statusEl.empty()
+                statusEl.createEl('p', { text: `Migration failed: ${err}`, cls: 'qc-migrate-error' })
+                migrateBtn.disabled = false
+                migrateBtn.setText('Migrate clips to new format')
+                return
+            }
+
+            statusEl.empty()
+
+            const summary = statusEl.createEl('p', { cls: 'qc-migrate-summary' })
+            summary.setText(
+                `✓ ${report.migrated} clip${report.migrated !== 1 ? 's' : ''} migrated` +
+                (report.skipped > 0 ? `, ${report.skipped} file${report.skipped !== 1 ? 's' : ''} already up to date` : '')
+            )
+
+            const issues = report.results.filter(r => r.status !== 'migrated')
+            if (issues.length > 0) {
+                statusEl.createEl('p', {
+                    text: `${issues.filter(r => r.status === 'error').length} error(s), ${issues.filter(r => r.status === 'warning').length} warning(s):`,
+                    cls: 'qc-migrate-issues-heading',
+                })
+                const list = statusEl.createEl('ul', { cls: 'qc-migrate-issues' })
+                for (const issue of issues) {
+                    this.renderIssueItem(list, issue)
+                }
+            }
+
+            migrateBtn.disabled = false
+            migrateBtn.setText('Migrate clips to new format')
+        })
+    }
+
+    private renderIssueItem(list: HTMLElement, issue: MigrationClipResult): void {
+        const li = list.createEl('li', { cls: `qc-migrate-issue qc-migrate-issue--${issue.status}` })
+
+        const tag = li.createEl('span', { cls: 'qc-migrate-issue-tag' })
+        tag.setText(issue.status === 'error' ? '✕ Error' : '⚠ Warning')
+
+        li.createEl('span', { text: `"${issue.preview}"`, cls: 'qc-migrate-issue-preview' })
+        li.createEl('span', { text: ` — ${issue.reason}`, cls: 'qc-migrate-issue-reason' })
+
+        const link = li.createEl('a', { text: ' Open file', cls: 'qc-migrate-issue-link' })
+        link.href = '#'
+        link.addEventListener('click', e => {
+            e.preventDefault()
+            const file = this.app.vault.getAbstractFileByPath(issue.filePath)
+            if (file instanceof TFile) this.app.workspace.getLeaf(false).openFile(file)
+        })
     }
 
     private rerenderView(): void {
