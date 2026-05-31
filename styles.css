@@ -920,3 +920,54 @@ th[data-col-key="has_notes"] {
     margin-left: auto;
     white-space: nowrap;
 }
+
+/* ── QuickClip callout type colors and icons ──────────────────────────────── */
+
+.callout[data-callout="qc_highlight"] {
+    --callout-color: 232, 168, 56;
+    --callout-icon: highlighter;
+}
+
+.callout[data-callout="qc_tweet"] {
+    --callout-color: 29, 155, 240;
+    --callout-icon: twitter;
+}
+
+.callout[data-callout="qc_pdf_highlight"] {
+    --callout-color: 224, 82, 82;
+    --callout-icon: file-text;
+}
+
+.callout[data-callout="qc_image"] {
+    --callout-color: 155, 89, 182;
+    --callout-icon: image;
+}
+
+.callout[data-callout="qc_note"] {
+    --callout-color: 107, 114, 128;
+    --callout-icon: message-circle;
+}
+
+.callout[data-callout="qc_details"] {
+    --callout-color: 156, 163, 175;
+    --callout-icon: info;
+}
+
+/* X logo for qc_tweet — Lucide dropped Twitter icon after rebrand */
+.callout[data-callout="qc_tweet"] .callout-icon svg {
+    display: none;
+}
+
+.callout[data-callout="qc_tweet"] .callout-icon::before {
+    content: '';
+    display: block;
+    width: 18px;
+    height: 18px;
+    background-color: rgb(var(--callout-color));
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z'/%3E%3C/svg%3E");
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+}
