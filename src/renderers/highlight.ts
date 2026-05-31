@@ -3,7 +3,7 @@ import { loadIndex, deleteClip, invalidateIndexCache } from '../clipsIndex'
 
 export function processHighlight(app: App, el: HTMLElement, ctx: MarkdownPostProcessorContext, confirmDelete: () => boolean): void {
     if (el.closest('.cm-editor')) return
-    if (!el.querySelector('[data-callout="quote"], [data-callout="clip"]')) return
+    if (!el.querySelector('[data-callout="quote"], [data-callout="clip"], [data-callout^="qc_"]')) return
     ctx.addChild(new HighlightScanner(el, app, ctx.sourcePath, confirmDelete))
 }
 
@@ -28,9 +28,16 @@ function transformSection(app: App, sourcePath: string, confirmDelete: () => boo
     if (calloutSection.querySelector('.qc-highlight-card')) return
     if (calloutSection.dataset.qcBuilding) return
 
-    const callout = calloutSection.querySelector<HTMLElement>('[data-callout="quote"], [data-callout="clip"]')
+    const callout = calloutSection.querySelector<HTMLElement>('[data-callout="quote"], [data-callout="clip"], [data-callout^="qc_"]')
     if (!callout) return
 
+    // New format: metadata is nested inside the callout — no sibling table needed
+    if ((callout.dataset.callout ?? '').startsWith('qc_')) {
+        buildCardV2(app, sourcePath, confirmDelete, calloutSection, callout)
+        return
+    }
+
+    // Old format: metadata lives in the sibling table section
     const tableSection = calloutSection.nextElementSibling as HTMLElement | null
     if (!tableSection) return
 
@@ -49,7 +56,7 @@ function transformSection(app: App, sourcePath: string, confirmDelete: () => boo
 
 // Called from main.ts on active-leaf-change to re-apply after Obsidian cache resets
 export function scanAndTransform(app: App, container: HTMLElement, sourcePath: string, confirmDelete: () => boolean): void {
-    const sections = Array.from(container.querySelectorAll('[data-callout="quote"], [data-callout="clip"]'))
+    const sections = Array.from(container.querySelectorAll('[data-callout="quote"], [data-callout="clip"], [data-callout^="qc_"]'))
     sections.forEach(callout => {
         const section = callout.closest('.el-div, .el-blockquote, div') as HTMLElement | null
         if (section && section.parentElement === container) {
@@ -345,6 +352,228 @@ async function buildCard(
     if (scrollEl && savedScrollTop !== undefined) scrollEl.scrollTop = savedScrollTop
 
     // Render tweet embed now that embedEl is attached to the live DOM
+    if (tweetEmbedEl && clipUrl) {
+        const embedComponent = new MarkdownRenderChild(tweetEmbedEl)
+        await MarkdownRenderer.render(app, `![](${clipUrl})`, tweetEmbedEl, sourcePath, embedComponent)
+    }
+}
+
+const CALLOUT_TO_CLIP_TYPE: Record<string, string> = {
+    'qc_highlight':     'highlight',
+    'qc_tweet':         'tweet',
+    'qc_pdf_highlight': 'pdf-highlight',
+    'qc_image':         'image',
+}
+
+async function buildCardV2(
+    app: App,
+    sourcePath: string,
+    confirmDelete: () => boolean,
+    calloutSection: HTMLElement,
+    callout: HTMLElement
+): Promise<void> {
+    calloutSection.dataset.qcBuilding = '1'
+
+    const clipType = CALLOUT_TO_CLIP_TYPE[callout.dataset.callout ?? ''] ?? 'highlight'
+
+    const contentEl = callout.querySelector<HTMLElement>('.callout-content')
+    if (!contentEl) { delete calloutSection.dataset.qcBuilding; return }
+
+    const detailsCallout = contentEl.querySelector<HTMLElement>('[data-callout="qc_details"]')
+    const noteCallout    = contentEl.querySelector<HTMLElement>('[data-callout="qc_note"]')
+
+    // Extract metadata from qc_details table
+    let captured = '', hash = '', viewHref = '', sourceHref = '', sourceLabel = '', pageNum = ''
+    const tags: string[] = []
+
+    if (detailsCallout) {
+        for (const row of Array.from(detailsCallout.querySelectorAll('tr'))) {
+            const key       = row.cells[0]?.textContent?.trim() ?? ''
+            const valueCell = row.cells[1]
+            if      (key === 'Captured')       captured    = (valueCell?.textContent?.trim() ?? '').replace(' | ', ' · ')
+            else if (key === 'Tags')           valueCell?.textContent?.split(/\s+/).filter(Boolean).forEach(t => tags.push(t))
+            else if (key === 'QuickClip Hash') hash        = valueCell?.textContent?.trim() ?? ''
+            else if (key === 'Source') {
+                const link = valueCell?.querySelector('a')
+                if (link) { sourceHref = link.href; sourceLabel = safeDecode(link.textContent?.trim() ?? '') }
+                else        sourceLabel = safeDecode(valueCell?.textContent?.trim() ?? '')
+            }
+            else if (key === 'Page')           pageNum     = valueCell?.textContent?.trim() ?? ''
+        }
+    }
+
+    // Extract source link from body: a <p> whose only non-whitespace child is an <a>
+    for (const child of Array.from(contentEl.children)) {
+        if (child.matches('[data-callout^="qc_"]')) break
+        if (child.tagName === 'P') {
+            const sig = Array.from(child.childNodes).filter(n => n.nodeType !== Node.TEXT_NODE || n.textContent?.trim())
+            if (sig.length === 1 && (sig[0] as Element).tagName === 'A') {
+                viewHref = (sig[0] as HTMLAnchorElement).href
+            }
+        }
+    }
+
+    // Look up clip URL from index by hash
+    let clipUrl = ''
+    if (hash) {
+        const index = await loadIndex(app)
+        outer: for (const [url, entry] of Object.entries(index)) {
+            for (const c of entry.clips) {
+                if (c.hash === hash) { clipUrl = url; break outer }
+            }
+        }
+        if (!clipUrl) {
+            invalidateIndexCache()
+            const fresh = await loadIndex(app)
+            retry: for (const [url, entry] of Object.entries(fresh)) {
+                for (const c of entry.clips) {
+                    if (c.hash === hash) { clipUrl = url; break retry }
+                }
+            }
+        }
+    }
+
+    delete calloutSection.dataset.qcBuilding
+
+    const badgeCfg = BADGE[clipType] ?? BADGE['highlight']
+
+    // Build quote block: body children that are not nested callouts or the source link paragraph
+    const quoteContentEl = document.createElement('div')
+    quoteContentEl.className = 'qc-highlight-quote'
+    for (const child of Array.from(contentEl.children)) {
+        if (child.matches('[data-callout^="qc_"]')) break
+        if (child.tagName === 'P') {
+            const sig = Array.from(child.childNodes).filter(n => n.nodeType !== Node.TEXT_NODE || n.textContent?.trim())
+            if (sig.length === 1 && (sig[0] as Element).tagName === 'A') continue
+        }
+        quoteContentEl.appendChild(child.cloneNode(true))
+    }
+    const hasOnlyImage = !!(quoteContentEl.querySelector('img')) && (quoteContentEl.textContent?.trim() ?? '') === ''
+    if (hasOnlyImage) quoteContentEl.classList.add('qc-highlight-quote--image')
+
+    const quoteIcon = document.createElement('span')
+    quoteIcon.className = 'qc-quote-icon'
+    quoteIcon.textContent = '❝'
+
+    const quoteBlock = document.createElement('div')
+    quoteBlock.className = 'qc-quote-block'
+    quoteBlock.appendChild(quoteIcon)
+    quoteBlock.appendChild(quoteContentEl)
+
+    // Footer
+    const footer = document.createElement('div')
+    footer.className = 'qc-highlight-footer'
+
+    if (tags.length) {
+        const sep1 = document.createElement('hr'); sep1.className = 'qc-sep'
+        const tagsEl = document.createElement('div'); tagsEl.className = 'qc-highlight-tags'
+        tags.forEach(tag => {
+            const chip = document.createElement('a')
+            chip.className = 'tag'; chip.textContent = tag; chip.href = tag
+            tagsEl.appendChild(chip)
+        })
+        footer.appendChild(sep1)
+        footer.appendChild(tagsEl)
+    }
+
+    const sep2 = document.createElement('hr'); sep2.className = 'qc-sep'
+    const actionsEl = document.createElement('div'); actionsEl.className = 'qc-highlight-actions'
+
+    const leftGroup = document.createElement('div'); leftGroup.className = 'qc-highlight-actions-left'
+    const badge = document.createElement('span'); badge.className = `qc-clip-badge ${badgeCfg.cls}`
+    const iconEl = document.createElement('span'); iconEl.className = 'qc-badge-icon'
+    setIcon(iconEl, badgeCfg.icon)
+    badge.appendChild(iconEl)
+    badge.appendChild(document.createTextNode(badgeCfg.label))
+    leftGroup.appendChild(badge)
+
+    const isPdf = clipType === 'pdf-highlight'
+    if (isPdf) {
+        if (sourceHref) {
+            const link = document.createElement('a')
+            link.href = sourceHref; link.className = 'qc-view-link external-link'
+            link.textContent = sourceLabel || 'Open PDF ↗'; link.target = '_blank'; link.rel = 'noopener'
+            leftGroup.appendChild(link)
+        } else if (sourceLabel) {
+            const localEl = document.createElement('span'); localEl.className = 'qc-captured'
+            localEl.textContent = sourceLabel; leftGroup.appendChild(localEl)
+        }
+        if (pageNum) {
+            const pageEl = document.createElement('span'); pageEl.className = 'qc-pdf-page'
+            pageEl.textContent = `p. ${pageNum}`; leftGroup.appendChild(pageEl)
+        }
+    } else if (viewHref) {
+        const link = document.createElement('a')
+        link.href = viewHref; link.className = 'qc-view-link external-link'
+        link.textContent = 'View at source ↗'; link.target = '_blank'; link.rel = 'noopener'
+        leftGroup.appendChild(link)
+    }
+    actionsEl.appendChild(leftGroup)
+
+    const rightGroup = document.createElement('div'); rightGroup.className = 'qc-highlight-actions-right'
+    if (captured) {
+        const capturedEl = document.createElement('span'); capturedEl.className = 'qc-captured'
+        capturedEl.textContent = captured; rightGroup.appendChild(capturedEl)
+        const pipeSep = document.createElement('span'); pipeSep.className = 'qc-footer-pipe'
+        pipeSep.textContent = '|'; rightGroup.appendChild(pipeSep)
+    }
+    if (hash) {
+        const deleteBtn = document.createElement('button')
+        deleteBtn.className = 'qc-delete-btn qc-card-delete-btn'
+        deleteBtn.textContent = '×'; deleteBtn.title = 'Delete clip'
+        deleteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation()
+            if (confirmDelete() && !window.confirm('Delete this clip?')) return
+            const index = await loadIndex(app)
+            let matchUrl = ''; let matchClip = null
+            for (const [url, entry] of Object.entries(index)) {
+                const c = entry.clips.find(c => c.hash === hash)
+                if (c) { matchUrl = url; matchClip = c; break }
+            }
+            if (!matchClip) return
+            await deleteClip(app, matchUrl, matchClip.hash)
+            const sep = calloutSection.nextElementSibling
+            calloutSection.remove()
+            if (sep?.tagName === 'HR') sep.remove()
+        })
+        rightGroup.appendChild(deleteBtn)
+    }
+    actionsEl.appendChild(rightGroup)
+    footer.appendChild(sep2)
+    footer.appendChild(actionsEl)
+
+    const card = document.createElement('div'); card.className = 'qc-highlight-card'
+
+    if (noteCallout) {
+        const cloned = noteCallout.cloneNode(true) as HTMLElement
+        cloned.classList.add('qc-note-callout')
+        cloned.querySelector('.callout-title-inner')?.remove()
+        const calloutTitle   = cloned.querySelector<HTMLElement>('.callout-title')
+        const calloutContent = cloned.querySelector<HTMLElement>('.callout-content')
+        if (calloutTitle && calloutContent) {
+            Array.from(calloutContent.childNodes).forEach(n => calloutTitle.appendChild(n))
+            calloutContent.remove()
+        }
+        card.appendChild(cloned)
+    }
+
+    let tweetEmbedEl: HTMLElement | null = null
+    if (clipType === 'tweet' && clipUrl) {
+        tweetEmbedEl = document.createElement('div'); tweetEmbedEl.className = 'qc-tweet-embed'
+        card.appendChild(tweetEmbedEl)
+    } else {
+        card.appendChild(quoteBlock)
+    }
+    card.appendChild(footer)
+
+    const scrollEl = calloutSection.closest('.markdown-preview-view') as HTMLElement | null
+    const savedScrollTop = scrollEl?.scrollTop
+
+    calloutSection.innerHTML = ''
+    calloutSection.appendChild(card)
+
+    if (scrollEl && savedScrollTop !== undefined) scrollEl.scrollTop = savedScrollTop
+
     if (tweetEmbedEl && clipUrl) {
         const embedComponent = new MarkdownRenderChild(tweetEmbedEl)
         await MarkdownRenderer.render(app, `![](${clipUrl})`, tweetEmbedEl, sourcePath, embedComponent)
