@@ -237,10 +237,20 @@ async function buildCard(
             link.rel = 'noopener'
             leftGroup.appendChild(link)
         } else if (sourceLabel) {
-            const localEl = document.createElement('span')
-            localEl.className = 'qc-captured'
-            localEl.textContent = sourceLabel
-            leftGroup.appendChild(localEl)
+            if (clipUrl?.startsWith('file://')) {
+                const link = document.createElement('a')
+                link.className = 'qc-view-link external-link'
+                link.textContent = sourceLabel
+                link.href = clipUrl
+                link.target = '_blank'
+                link.rel = 'noopener'
+                leftGroup.appendChild(link)
+            } else {
+                const localEl = document.createElement('span')
+                localEl.className = 'qc-captured'
+                localEl.textContent = sourceLabel
+                leftGroup.appendChild(localEl)
+            }
         }
         if (pageNum) {
             const pageEl = document.createElement('span')
@@ -498,8 +508,16 @@ async function buildCardV2(
             link.textContent = sourceLabel || 'Open PDF ↗'; link.target = '_blank'; link.rel = 'noopener'
             leftGroup.appendChild(link)
         } else if (sourceLabel) {
-            const localEl = document.createElement('span'); localEl.className = 'qc-captured'
-            localEl.textContent = sourceLabel; leftGroup.appendChild(localEl)
+            if (clipUrl?.startsWith('file://')) {
+                const link = document.createElement('a')
+                link.className = 'qc-view-link external-link'
+                link.textContent = sourceLabel
+                link.href = clipUrl; link.target = '_blank'; link.rel = 'noopener'
+                leftGroup.appendChild(link)
+            } else {
+                const localEl = document.createElement('span'); localEl.className = 'qc-captured'
+                localEl.textContent = sourceLabel; leftGroup.appendChild(localEl)
+            }
         }
         if (pageNum) {
             const pageEl = document.createElement('span'); pageEl.className = 'qc-pdf-page'
