@@ -1,7 +1,7 @@
 import { App, PluginSettingTab, Setting, TFile } from 'obsidian'
 import QuickClipCapturePlugin from './main'
 import { VIEW_CLIP_MANAGER } from './views/ClipManagerView'
-import { migrateOldFormatClips, MigrationClipResult } from './migration'
+import { migrateOldFormatClips, hasOldFormatClips, MigrationClipResult } from './migration'
 
 export class QuickClipSettingTab extends PluginSettingTab {
     constructor(app: App, private plugin: QuickClipCapturePlugin) {
@@ -88,18 +88,26 @@ export class QuickClipSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings()
                 }))
 
-        containerEl.createEl('h3', { text: 'Migration' })
-        containerEl.createEl('p', {
-            text: 'Convert clips saved in the old [!quote] format to the new qc_* nested callout format. Clips already in the new format are skipped. This cannot be undone — back up your vault first.',
+        // Entire migration section — hidden until we confirm old clips exist
+        const migrateSection = containerEl.createDiv()
+        migrateSection.style.display = 'none'
+
+        migrateSection.createEl('h3', { text: 'Migration' })
+        migrateSection.createEl('p', {
+            text: 'This will rewrite your clip files to use the new nested callout format. Already-migrated clips are left untouched. Cannot be undone — stay on this screen until migration finishes. Errors and warnings, if any, will be listed below.',
             cls: 'setting-item-description',
         })
 
-        const migrateBtn = containerEl.createEl('button', { text: 'Migrate clips to new format', cls: 'mod-cta' })
-        const statusEl   = containerEl.createDiv({ cls: 'qc-migrate-status' })
+        const migrateBtn = migrateSection.createEl('button', { text: 'Migrate clips to new format', cls: 'mod-cta' })
+        const statusEl = migrateSection.createDiv({ cls: 'qc-migrate-status' })
 
-        // Render persisted results from last run
-        if (this.plugin.settings.lastMigrationReport) {
-            this.renderMigrationResults(statusEl, this.plugin.settings.lastMigrationReport)
+        const stored = this.plugin.settings.lastMigrationReport
+
+        if (!(stored && this.nothingToMigrate(stored))) {
+            // No confirmed-clean result — scan to check
+            hasOldFormatClips(this.app).then(hasOld => {
+                if (hasOld) migrateSection.style.display = ''
+            })
         }
 
         migrateBtn.addEventListener('click', async () => {
@@ -122,27 +130,41 @@ export class QuickClipSettingTab extends PluginSettingTab {
                 return
             }
 
-            const stored = {
+            const result = {
                 migrated: report.migrated,
                 skipped: report.skipped,
                 timestamp: new Date().toISOString(),
                 results: report.results,
             }
-            this.plugin.settings.lastMigrationReport = stored
+            this.plugin.settings.lastMigrationReport = result
             await this.plugin.saveSettings()
 
             statusEl.empty()
-            this.renderMigrationResults(statusEl, stored)
+            this.renderMigrationResults(statusEl, result)
 
-            migrateBtn.disabled = false
-            migrateBtn.setText('Migrate clips to new format')
+            // Hide entire section if nothing left; re-enable button if errors remain
+            if (this.nothingToMigrate(result)) {
+                migrateSection.style.display = 'none'
+            } else {
+                migrateBtn.disabled = false
+                migrateBtn.setText('Migrate clips to new format')
+            }
         })
+    }
+
+    private nothingToMigrate(report: { migrated: number; results: Array<{ status: string }> }): boolean {
+        return report.migrated === 0 && report.results.filter(r => r.status !== 'migrated').length === 0
     }
 
     private renderMigrationResults(statusEl: HTMLElement, report: { migrated: number; skipped: number; timestamp?: string; results: Array<{ filePath: string; preview: string; status: string; reason: string }> }): void {
         const summary = statusEl.createEl('p', { cls: 'qc-migrate-summary' })
-        let summaryText = `✓ ${report.migrated} clip${report.migrated !== 1 ? 's' : ''} migrated`
-        if (report.skipped > 0) summaryText += `, ${report.skipped} file${report.skipped !== 1 ? 's' : ''} already up to date`
+        let summaryText: string
+        if (this.nothingToMigrate(report)) {
+            summaryText = 'No clips to migrate. Seems like you are already saving using the new format.'
+        } else {
+            summaryText = `✓ ${report.migrated} clip${report.migrated !== 1 ? 's' : ''} migrated`
+            if (report.skipped > 0) summaryText += `, ${report.skipped} file${report.skipped !== 1 ? 's' : ''} already up to date`
+        }
         if (report.timestamp) {
             const d = new Date(report.timestamp)
             summaryText += ` — ${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`

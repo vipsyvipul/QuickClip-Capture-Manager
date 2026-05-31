@@ -222,6 +222,24 @@ function buildNewBlock(block: OldBlock, hash: string): string {
     return s
 }
 
+// ─── Detection ───────────────────────────────────────────────────────────────
+
+export async function hasOldFormatClips(app: App): Promise<boolean> {
+    const index = await loadIndex(app)
+    const seen = new Set<string>()
+    for (const entry of Object.values(index)) {
+        for (const clip of (entry as any).clips ?? []) {
+            if (!clip.path || seen.has(clip.path)) continue
+            seen.add(clip.path)
+            const file = app.vault.getAbstractFileByPath(clip.path)
+            if (!(file instanceof TFile)) continue
+            const content = await app.vault.read(file)
+            if (/^> \[!(quote|clip)\]/im.test(content)) return true
+        }
+    }
+    return false
+}
+
 // ─── Main migration ──────────────────────────────────────────────────────────
 
 export async function migrateOldFormatClips(app: App): Promise<MigrationReport> {
