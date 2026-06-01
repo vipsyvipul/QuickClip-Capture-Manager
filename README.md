@@ -2,7 +2,7 @@
 
 An Obsidian plugin that renders and manages clips saved by the [QuickClip Capture](https://chromewebstore.google.com/detail/quickclip/edabdpgppnhbogfpdghjekdalmipflel) Chrome extension.
 
-QuickClip is a web clipper built for Obsidian — highlight text, clip full pages, save tweets, PDF excerpts, YouTube timestamps, and images directly into your vault. This plugin handles the Obsidian side: polished reading view cards for every clip type, and a Clip Manager to browse, filter, tag, and annotate everything you've saved.
+QuickClip Capture is a web clipper built for Obsidian — highlight text, clip full pages, save tweets, PDF excerpts, YouTube timestamps, and images directly into your vault. This plugin handles the Obsidian side: polished reading view cards for every clip type, and a Clip Manager to browse, filter, tag, and annotate everything you've saved.
 
 ---
 
@@ -64,7 +64,7 @@ A dedicated panel (accessible from the ribbon or command palette) to browse ever
 
 1. Install the QuickClip Capture Chrome extension and point it at your vault folder
 2. Clip anything from Chrome — highlights, pages, tweets, PDFs, YouTube timestamps
-3. Open the clipped note in Obsidian's Reading view to see the rendered cards
+3. Open the clipped note in Obsidian's **Reading** view to see the rendered cards
 4. Open the Clip Manager (ribbon icon or `Cmd/Ctrl+P` → "Open Clip Manager") to browse, tag, and annotate all your clips
 
 ---
