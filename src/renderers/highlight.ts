@@ -369,6 +369,8 @@ async function buildCard(
 
             // Remove "Note" title text
             cloned.querySelector('.callout-title-inner')?.remove()
+            const iconEl = cloned.querySelector<HTMLElement>('.callout-icon')
+            if (iconEl) setIcon(iconEl, 'message-circle')
 
             // Move content nodes inline into the title (after the icon)
             const calloutTitle = cloned.querySelector<HTMLElement>('.callout-title')
@@ -619,6 +621,8 @@ async function buildCardV2(
         const cloned = noteCallout.cloneNode(true) as HTMLElement
         cloned.classList.add('qc-note-callout')
         cloned.querySelector('.callout-title-inner')?.remove()
+        const iconEl = cloned.querySelector<HTMLElement>('.callout-icon')
+        if (iconEl) setIcon(iconEl, 'message-circle')
         const calloutTitle   = cloned.querySelector<HTMLElement>('.callout-title')
         const calloutContent = cloned.querySelector<HTMLElement>('.callout-content')
         if (calloutTitle && calloutContent) {
