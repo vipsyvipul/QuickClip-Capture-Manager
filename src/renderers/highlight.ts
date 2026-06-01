@@ -89,6 +89,39 @@ const BADGE: Record<string, BadgeCfg> = {
     'image':         { cls: 'qc-badge-image',         icon: 'image',       label: 'Image' },
 }
 
+const QC_EXPANDED_KEY = 'qc-expanded-clips'
+function getExpandedSet(): Set<string> {
+    try { return new Set(JSON.parse(localStorage.getItem(QC_EXPANDED_KEY) ?? '[]')) }
+    catch { return new Set() }
+}
+function persistExpanded(key: string, expanded: boolean): void {
+    const set = getExpandedSet()
+    expanded ? set.add(key) : set.delete(key)
+    localStorage.setItem(QC_EXPANDED_KEY, JSON.stringify([...set]))
+}
+
+function buildCardHeader(card: HTMLElement, badgeCfg: BadgeCfg, summaryText: string, persistKey: string): void {
+    const cardHeader = document.createElement('div')
+    cardHeader.className = 'qc-card-header'
+    const chevronEl = document.createElement('span')
+    chevronEl.className = 'qc-card-chevron'
+    setIcon(chevronEl, 'chevron-down')
+    const iconEl = document.createElement('span')
+    iconEl.className = 'qc-card-header-icon'
+    setIcon(iconEl, badgeCfg.icon)
+    const headerSummary = document.createElement('span')
+    headerSummary.className = 'qc-card-header-summary'
+    headerSummary.textContent = summaryText ? `${badgeCfg.label} — ${summaryText}` : badgeCfg.label
+    cardHeader.appendChild(chevronEl)
+    cardHeader.appendChild(iconEl)
+    cardHeader.appendChild(headerSummary)
+    cardHeader.addEventListener('click', () => {
+        const nowCollapsed = card.classList.toggle('qc-card-collapsed')
+        persistExpanded(persistKey, !nowCollapsed)
+    })
+    card.appendChild(cardHeader)
+}
+
 async function buildCard(
     app: App,
     sourcePath: string,
@@ -320,19 +353,10 @@ async function buildCard(
     const card = document.createElement('div')
     card.className = 'qc-highlight-card'
 
-    const cardHeader = document.createElement('div')
-    cardHeader.className = 'qc-card-header'
-    const chevronEl = document.createElement('span')
-    chevronEl.className = 'qc-card-chevron'
-    setIcon(chevronEl, 'chevron-down')
-    const headerSummary = document.createElement('span')
-    headerSummary.className = 'qc-card-header-summary'
-    const summaryText = (quoteEl.textContent?.trim() ?? '').slice(0, 60)
-    headerSummary.textContent = summaryText ? `${badgeCfg.label} — ${summaryText}` : badgeCfg.label
-    cardHeader.appendChild(chevronEl)
-    cardHeader.appendChild(headerSummary)
-    cardHeader.addEventListener('click', () => card.classList.toggle('qc-card-collapsed'))
-    card.appendChild(cardHeader)
+    const persistKey = `${sourcePath}::${captured}`
+    if (!getExpandedSet().has(persistKey)) card.classList.add('qc-card-collapsed')
+    const raw = quoteEl.textContent?.trim() ?? ''
+    buildCardHeader(card, badgeCfg, raw.length > 60 ? raw.slice(0, 60) + '…' : raw, persistKey)
 
     const cardBody = document.createElement('div')
     cardBody.className = 'qc-card-body'
@@ -584,16 +608,10 @@ async function buildCardV2(
 
     const card = document.createElement('div'); card.className = 'qc-highlight-card'
 
-    const cardHeader = document.createElement('div'); cardHeader.className = 'qc-card-header'
-    const chevronEl = document.createElement('span'); chevronEl.className = 'qc-card-chevron'
-    setIcon(chevronEl, 'chevron-down')
-    const headerSummary = document.createElement('span'); headerSummary.className = 'qc-card-header-summary'
-    const summaryText = (quoteContentEl.textContent?.trim() ?? '').slice(0, 60)
-    headerSummary.textContent = summaryText ? `${badgeCfg.label} — ${summaryText}` : badgeCfg.label
-    cardHeader.appendChild(chevronEl)
-    cardHeader.appendChild(headerSummary)
-    cardHeader.addEventListener('click', () => card.classList.toggle('qc-card-collapsed'))
-    card.appendChild(cardHeader)
+    const persistKey = hash || `${sourcePath}::${captured}`
+    if (!getExpandedSet().has(persistKey)) card.classList.add('qc-card-collapsed')
+    const raw = quoteContentEl.textContent?.trim() ?? ''
+    buildCardHeader(card, badgeCfg, raw.length > 60 ? raw.slice(0, 60) + '…' : raw, persistKey)
 
     const cardBody = document.createElement('div'); cardBody.className = 'qc-card-body'
 

@@ -1010,6 +1010,8 @@ th[data-col-key="has_notes"] {
 
 .qc-card-chevron {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
     width: 14px;
     height: 14px;
     color: var(--text-muted);
@@ -1023,6 +1025,19 @@ th[data-col-key="has_notes"] {
 
 .qc-card-collapsed .qc-card-chevron {
     transform: rotate(-90deg);
+}
+
+.qc-card-header-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    width: 12px;
+    height: 12px;
+}
+
+.qc-card-header-icon svg {
+    width: 12px;
+    height: 12px;
 }
 
 .qc-card-header-summary {
