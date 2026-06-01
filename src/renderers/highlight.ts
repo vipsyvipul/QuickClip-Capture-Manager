@@ -1,5 +1,6 @@
 import { App, MarkdownPostProcessorContext, MarkdownRenderChild, MarkdownRenderer, setIcon } from 'obsidian'
 import { loadIndex, deleteClip, invalidateIndexCache } from '../clipsIndex'
+import { X_ICON_ID } from '../main'
 
 export function processHighlight(app: App, el: HTMLElement, ctx: MarkdownPostProcessorContext, confirmDelete: () => boolean): void {
     if (el.closest('.cm-editor')) return
@@ -83,7 +84,7 @@ type BadgeCfg = { cls: string; icon: string; label: string }
 const BADGE: Record<string, BadgeCfg> = {
     'highlight':     { cls: 'qc-badge-highlight',     icon: 'highlighter', label: 'Highlight' },
     'pdf-highlight': { cls: 'qc-badge-pdf-highlight', icon: 'file-text',   label: 'PDF' },
-    'tweet':         { cls: 'qc-badge-tweet',         icon: 'twitter',     label: 'Tweet' },
+    'tweet':         { cls: 'qc-badge-tweet',         icon: X_ICON_ID,     label: 'Tweet' },
     'image':         { cls: 'qc-badge-image',         icon: 'image',       label: 'Image' },
 }
 
