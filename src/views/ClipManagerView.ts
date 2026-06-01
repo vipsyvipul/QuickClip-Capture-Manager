@@ -82,7 +82,7 @@ export class ClipManagerView extends ItemView {
     }
 
     getViewType(): string { return VIEW_CLIP_MANAGER }
-    getDisplayText(): string { return 'QuickClip Capture' }
+    getDisplayText(): string { return 'QuickClip Capture Manager' }
     getIcon(): string { return 'quickclip-capture' }
 
     async onOpen(): Promise<void> {
@@ -292,7 +292,7 @@ export class ClipManagerView extends ItemView {
         contentEl.addClass('qc-manager')
 
         const header = contentEl.createDiv('qc-manager-header')
-        header.createEl('h2', { text: 'QuickClip Capture' })
+        header.createEl('h2', { text: 'QuickClip Capture Manager' })
         const right = header.createDiv('qc-manager-header-right')
         right.createDiv('qc-manager-count')
         const refreshBtn = right.createEl('button', { cls: 'qc-refresh-btn', attr: { title: 'Refresh', 'aria-label': 'Refresh' } })
