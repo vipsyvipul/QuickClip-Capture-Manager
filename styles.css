@@ -114,8 +114,6 @@
     height: 20px;
     min-width: 20px;
     min-height: 20px;
-    padding: 0 !important;
-    border-radius: 50% !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -126,13 +124,18 @@
     transition: opacity 150ms;
 }
 
+.qc-highlight-card .qc-card-delete-btn {
+    padding: 0;
+    border-radius: 50%;
+}
+
 .qc-highlight-card:hover .qc-card-delete-btn {
     opacity: 0.4;
     transition: opacity 0ms;
 }
 
-.qc-card-delete-btn:hover {
-    opacity: 1 !important;
+.qc-highlight-card:hover .qc-card-delete-btn:hover {
+    opacity: 1;
     transition: opacity 0ms;
 }
 
@@ -515,8 +518,6 @@ th[data-col-key="has_notes"] {
 
 .qc-tag-remove {
     all: unset;
-    background: transparent !important;
-    box-shadow: none !important;
     cursor: pointer;
     font-size: 0.8em;
     line-height: 1;
@@ -967,9 +968,6 @@ th[data-col-key="has_notes"] {
     padding: 0 4px;
     display: inline-flex;
     align-items: center;
-    background: none !important;
-    border: none !important;
-    box-shadow: none !important;
 }
 
 .qc-color-row-reset:hover {
@@ -993,27 +991,69 @@ th[data-col-key="has_notes"] {
 /* ── QuickClip callout type colors and icons ──────────────────────────────── */
 
 .callout[data-callout="qc_highlight"] { --callout-icon: highlighter; }
-.callout[data-callout="qc_tweet"]     { --callout-icon: twitter; }
+.callout[data-callout="qc_tweet"]     { --callout-icon: qc-x-brand; }
 .callout[data-callout="qc_pdf_highlight"] { --callout-icon: file-text; }
 .callout[data-callout="qc_image"]    { --callout-icon: image; }
 .callout[data-callout="qc_note"]     { --callout-icon: message-circle; }
 .callout[data-callout="qc_details"]  { --callout-icon: info; }
 
-/* X logo for qc_tweet — Lucide dropped Twitter icon after rebrand */
-.callout[data-callout="qc_tweet"] .callout-icon svg {
+/* ── Collapsible card header ──────────────────────────────────────────────── */
+
+.qc-card-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    padding-bottom: 6px;
+}
+
+.qc-card-chevron {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
+    transition: transform 150ms;
+}
+
+.qc-card-chevron svg {
+    width: 14px;
+    height: 14px;
+}
+
+.qc-card-collapsed .qc-card-chevron {
+    transform: rotate(-90deg);
+}
+
+.qc-card-header-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    width: 12px;
+    height: 12px;
+}
+
+.qc-card-header-icon svg {
+    width: 12px;
+    height: 12px;
+}
+
+.qc-card-header-summary {
+    font-size: 0.875em;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.qc-card-collapsed .qc-card-body {
     display: none;
 }
 
-.callout[data-callout="qc_tweet"] .callout-icon::before {
-    content: '';
-    display: block;
-    width: 18px;
-    height: 18px;
-    background-color: rgb(var(--callout-color));
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z'/%3E%3C/svg%3E");
-    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z'/%3E%3C/svg%3E");
-    -webkit-mask-size: contain;
-    mask-size: contain;
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
+.qc-note-callout .callout-fold {
+    display: none;
 }

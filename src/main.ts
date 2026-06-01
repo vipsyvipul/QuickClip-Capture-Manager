@@ -65,6 +65,9 @@ const QC_ICON_SVG =
     '<path d="M 32 32 L 36 20 Q 36 12 43 12 L 57 12 Q 64 12 64 20 L 68 32" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>' +
     '<path d="M 94 44 L 56 44 Q 50 44 50 51 Q 50 58 56 58 L 94 58" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>'
 
+const X_ICON_ID = 'qc-x-brand'
+const X_ICON_SVG = '<path fill="currentColor" transform="scale(4.16667)" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>'
+
 export default class QuickClipCapturePlugin extends Plugin {
     settings!: PluginSettings
     private calloutStyleEl: HTMLStyleElement | null = null
@@ -72,6 +75,7 @@ export default class QuickClipCapturePlugin extends Plugin {
     async onload(): Promise<void> {
         await this.loadSettings()
         addIcon(QC_ICON_ID, QC_ICON_SVG)
+        addIcon(X_ICON_ID, X_ICON_SVG)
         this.injectCalloutColors()
 
         this.registerView(
@@ -129,7 +133,7 @@ export default class QuickClipCapturePlugin extends Plugin {
         if (this.settings.autoOpenOnStartup)
             this.app.workspace.onLayoutReady(() => this.activateView())
 
-        this.addRibbonIcon(QC_ICON_ID, 'QuickClip Capture', () => this.activateView())
+        this.addRibbonIcon(QC_ICON_ID, 'QuickClip Capture Manager', () => this.activateView())
 
         this.addCommand({
             id: 'open-manager',

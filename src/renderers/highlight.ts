@@ -1,6 +1,8 @@
 import { App, MarkdownPostProcessorContext, MarkdownRenderChild, MarkdownRenderer, setIcon } from 'obsidian'
 import { loadIndex, deleteClip, invalidateIndexCache } from '../clipsIndex'
 
+const X_ICON_ID = 'qc-x-brand'
+
 export function processHighlight(app: App, el: HTMLElement, ctx: MarkdownPostProcessorContext, confirmDelete: () => boolean): void {
     if (el.closest('.cm-editor')) return
     if (!el.querySelector('[data-callout="quote"], [data-callout="clip"], [data-callout^="qc_"]')) return
@@ -83,8 +85,41 @@ type BadgeCfg = { cls: string; icon: string; label: string }
 const BADGE: Record<string, BadgeCfg> = {
     'highlight':     { cls: 'qc-badge-highlight',     icon: 'highlighter', label: 'Highlight' },
     'pdf-highlight': { cls: 'qc-badge-pdf-highlight', icon: 'file-text',   label: 'PDF' },
-    'tweet':         { cls: 'qc-badge-tweet',         icon: 'twitter',     label: 'Tweet' },
+    'tweet':         { cls: 'qc-badge-tweet',         icon: X_ICON_ID,     label: 'Tweet' },
     'image':         { cls: 'qc-badge-image',         icon: 'image',       label: 'Image' },
+}
+
+const QC_EXPANDED_KEY = 'qc-expanded-clips'
+function getExpandedSet(): Set<string> {
+    try { return new Set(JSON.parse(localStorage.getItem(QC_EXPANDED_KEY) ?? '[]')) }
+    catch { return new Set() }
+}
+function persistExpanded(key: string, expanded: boolean): void {
+    const set = getExpandedSet()
+    expanded ? set.add(key) : set.delete(key)
+    localStorage.setItem(QC_EXPANDED_KEY, JSON.stringify([...set]))
+}
+
+function buildCardHeader(card: HTMLElement, badgeCfg: BadgeCfg, summaryText: string, persistKey: string): void {
+    const cardHeader = document.createElement('div')
+    cardHeader.className = 'qc-card-header'
+    const chevronEl = document.createElement('span')
+    chevronEl.className = 'qc-card-chevron'
+    setIcon(chevronEl, 'chevron-down')
+    const iconEl = document.createElement('span')
+    iconEl.className = 'qc-card-header-icon'
+    setIcon(iconEl, badgeCfg.icon)
+    const headerSummary = document.createElement('span')
+    headerSummary.className = 'qc-card-header-summary'
+    headerSummary.textContent = summaryText ? `${badgeCfg.label} — ${summaryText}` : badgeCfg.label
+    cardHeader.appendChild(chevronEl)
+    cardHeader.appendChild(iconEl)
+    cardHeader.appendChild(headerSummary)
+    cardHeader.addEventListener('click', () => {
+        const nowCollapsed = card.classList.toggle('qc-card-collapsed')
+        persistExpanded(persistKey, !nowCollapsed)
+    })
+    card.appendChild(cardHeader)
 }
 
 async function buildCard(
@@ -237,10 +272,20 @@ async function buildCard(
             link.rel = 'noopener'
             leftGroup.appendChild(link)
         } else if (sourceLabel) {
-            const localEl = document.createElement('span')
-            localEl.className = 'qc-captured'
-            localEl.textContent = sourceLabel
-            leftGroup.appendChild(localEl)
+            if (clipUrl?.startsWith('file://')) {
+                const link = document.createElement('a')
+                link.className = 'qc-view-link external-link'
+                link.textContent = sourceLabel
+                link.href = clipUrl
+                link.target = '_blank'
+                link.rel = 'noopener'
+                leftGroup.appendChild(link)
+            } else {
+                const localEl = document.createElement('span')
+                localEl.className = 'qc-captured'
+                localEl.textContent = sourceLabel
+                leftGroup.appendChild(localEl)
+            }
         }
         if (pageNum) {
             const pageEl = document.createElement('span')
@@ -252,7 +297,7 @@ async function buildCard(
         const link = document.createElement('a')
         link.href = viewHref
         link.className = 'qc-view-link external-link'
-        link.textContent = 'View at source ↗'
+        link.textContent = clipType === 'tweet' ? 'View tweet ↗' : 'View with highlight ↗'
         link.target = '_blank'
         link.rel = 'noopener'
         leftGroup.appendChild(link)
@@ -308,6 +353,14 @@ async function buildCard(
     const card = document.createElement('div')
     card.className = 'qc-highlight-card'
 
+    const persistKey = `${sourcePath}::${captured}`
+    if (!getExpandedSet().has(persistKey)) card.classList.add('qc-card-collapsed')
+    const raw = quoteEl.textContent?.trim() ?? ''
+    buildCardHeader(card, badgeCfg, raw.length > 60 ? raw.slice(0, 60) + '…' : raw, persistKey)
+
+    const cardBody = document.createElement('div')
+    cardBody.className = 'qc-card-body'
+
     if (noteSection) {
         const noteCallout = noteSection.querySelector('[data-callout="note"]')
         if (noteCallout) {
@@ -316,6 +369,8 @@ async function buildCard(
 
             // Remove "Note" title text
             cloned.querySelector('.callout-title-inner')?.remove()
+            const iconEl = cloned.querySelector<HTMLElement>('.callout-icon')
+            if (iconEl) setIcon(iconEl, 'message-circle')
 
             // Move content nodes inline into the title (after the icon)
             const calloutTitle = cloned.querySelector<HTMLElement>('.callout-title')
@@ -325,21 +380,20 @@ async function buildCard(
                 calloutContent.remove()
             }
 
-            card.appendChild(cloned)
+            cardBody.appendChild(cloned)
         }
     }
 
     let tweetEmbedEl: HTMLElement | null = null
     if (clipType === 'tweet' && clipUrl) {
-        // Placeholder appended now; embed rendered after card is in the live DOM
-        // so Obsidian's embed provider can initialize correctly.
         tweetEmbedEl = document.createElement('div')
         tweetEmbedEl.className = 'qc-tweet-embed'
-        card.appendChild(tweetEmbedEl)
+        cardBody.appendChild(tweetEmbedEl)
     } else {
-        card.appendChild(quoteBlock)
+        cardBody.appendChild(quoteBlock)
     }
-    card.appendChild(footer)
+    cardBody.appendChild(footer)
+    card.appendChild(cardBody)
 
     // Save scroll position before any DOM mutations so the browser's scroll
     // anchor algorithm can't snap the view when content height changes.
@@ -498,8 +552,16 @@ async function buildCardV2(
             link.textContent = sourceLabel || 'Open PDF ↗'; link.target = '_blank'; link.rel = 'noopener'
             leftGroup.appendChild(link)
         } else if (sourceLabel) {
-            const localEl = document.createElement('span'); localEl.className = 'qc-captured'
-            localEl.textContent = sourceLabel; leftGroup.appendChild(localEl)
+            if (clipUrl?.startsWith('file://')) {
+                const link = document.createElement('a')
+                link.className = 'qc-view-link external-link'
+                link.textContent = sourceLabel
+                link.href = clipUrl; link.target = '_blank'; link.rel = 'noopener'
+                leftGroup.appendChild(link)
+            } else {
+                const localEl = document.createElement('span'); localEl.className = 'qc-captured'
+                localEl.textContent = sourceLabel; leftGroup.appendChild(localEl)
+            }
         }
         if (pageNum) {
             const pageEl = document.createElement('span'); pageEl.className = 'qc-pdf-page'
@@ -508,7 +570,8 @@ async function buildCardV2(
     } else if (viewHref) {
         const link = document.createElement('a')
         link.href = viewHref; link.className = 'qc-view-link external-link'
-        link.textContent = 'View at source ↗'; link.target = '_blank'; link.rel = 'noopener'
+        link.textContent = clipType === 'tweet' ? 'View tweet ↗' : 'View with highlight ↗'
+        link.target = '_blank'; link.rel = 'noopener'
         leftGroup.appendChild(link)
     }
     actionsEl.appendChild(leftGroup)
@@ -547,27 +610,37 @@ async function buildCardV2(
 
     const card = document.createElement('div'); card.className = 'qc-highlight-card'
 
+    const persistKey = hash || `${sourcePath}::${captured}`
+    if (!getExpandedSet().has(persistKey)) card.classList.add('qc-card-collapsed')
+    const raw = quoteContentEl.textContent?.trim() ?? ''
+    buildCardHeader(card, badgeCfg, raw.length > 60 ? raw.slice(0, 60) + '…' : raw, persistKey)
+
+    const cardBody = document.createElement('div'); cardBody.className = 'qc-card-body'
+
     if (noteCallout) {
         const cloned = noteCallout.cloneNode(true) as HTMLElement
         cloned.classList.add('qc-note-callout')
         cloned.querySelector('.callout-title-inner')?.remove()
+        const iconEl = cloned.querySelector<HTMLElement>('.callout-icon')
+        if (iconEl) setIcon(iconEl, 'message-circle')
         const calloutTitle   = cloned.querySelector<HTMLElement>('.callout-title')
         const calloutContent = cloned.querySelector<HTMLElement>('.callout-content')
         if (calloutTitle && calloutContent) {
             Array.from(calloutContent.childNodes).forEach(n => calloutTitle.appendChild(n))
             calloutContent.remove()
         }
-        card.appendChild(cloned)
+        cardBody.appendChild(cloned)
     }
 
     let tweetEmbedEl: HTMLElement | null = null
     if (clipType === 'tweet' && clipUrl) {
         tweetEmbedEl = document.createElement('div'); tweetEmbedEl.className = 'qc-tweet-embed'
-        card.appendChild(tweetEmbedEl)
+        cardBody.appendChild(tweetEmbedEl)
     } else {
-        card.appendChild(quoteBlock)
+        cardBody.appendChild(quoteBlock)
     }
-    card.appendChild(footer)
+    cardBody.appendChild(footer)
+    card.appendChild(cardBody)
 
     const scrollEl = calloutSection.closest('.markdown-preview-view') as HTMLElement | null
     const savedScrollTop = scrollEl?.scrollTop
