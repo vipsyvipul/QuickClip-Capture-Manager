@@ -49,7 +49,7 @@ export class QuickClipSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Snippet length')
-            .setDesc('Characters shown in the Clip column (15–60).')
+            .setDesc('Number of characters shown in the Clip column of the Clip Manager (15–60).')
             .addSlider(s => s
                 .setLimits(15, 60, 1)
                 .setValue(this.plugin.settings.snippetLength)
