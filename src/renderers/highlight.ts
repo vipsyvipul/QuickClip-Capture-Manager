@@ -218,7 +218,7 @@ async function buildCard(
 
     const quoteEl = document.createElement('div')
     quoteEl.className = 'qc-highlight-quote'
-    quoteEl.innerHTML = contentEl.innerHTML
+    Array.from(contentEl.childNodes).forEach(n => quoteEl.appendChild(n.cloneNode(true)))
 
     const hasOnlyImage = !!(quoteEl.querySelector('img')) && (quoteEl.textContent?.trim() ?? '') === ''
     if (hasOnlyImage) quoteEl.classList.add('qc-highlight-quote--image')
@@ -403,11 +403,10 @@ async function buildCard(
     const scrollEl = calloutSection.closest('.markdown-preview-view') as HTMLElement | null
     const savedScrollTop = scrollEl?.scrollTop
 
-    calloutSection.innerHTML = ''
+    calloutSection.empty()
     calloutSection.appendChild(card)
     tableSection.classList.add('qc-table-hidden')
-    tableSection.style.display = 'none'
-    if (noteSection) noteSection.style.display = 'none'
+    if (noteSection) noteSection.addClass('is-hidden')
 
     if (scrollEl && savedScrollTop !== undefined) scrollEl.scrollTop = savedScrollTop
 
@@ -648,7 +647,7 @@ async function buildCardV2(
     const scrollEl = calloutSection.closest('.markdown-preview-view') as HTMLElement | null
     const savedScrollTop = scrollEl?.scrollTop
 
-    calloutSection.innerHTML = ''
+    calloutSection.empty()
     calloutSection.appendChild(card)
 
     if (scrollEl && savedScrollTop !== undefined) scrollEl.scrollTop = savedScrollTop

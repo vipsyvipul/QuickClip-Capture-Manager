@@ -60,7 +60,7 @@ class FullPageNoteScanner extends MarkdownRenderChild {
         bar.appendChild(iconEl)
         bar.appendChild(textEl)
 
-        this.containerEl.innerHTML = ''
+        this.containerEl.empty()
         this.containerEl.appendChild(bar)
     }
 }
@@ -83,7 +83,7 @@ export function injectFullPageHeader(app: App, container: HTMLElement, sourcePat
     if (!previewView) return
 
     const anchor = previewView.querySelector('.metadata-container') ?? previewView.querySelector('.frontmatter')
-    if (anchor) (anchor as HTMLElement).style.display = 'none'
+    if (anchor) (anchor as HTMLElement).addClass('is-hidden')
     let insertAfter: Element | null = anchor
 
     // ── Header pills ──────────────────────────────────────────────
@@ -148,13 +148,13 @@ export function injectFullPageHeader(app: App, container: HTMLElement, sourcePat
     previewView.addEventListener('scroll', () => {
         const { scrollTop, scrollHeight, clientHeight } = previewView
         const max = scrollHeight - clientHeight
-        progressFill.style.width = max > 0 ? `${(scrollTop / max) * 100}%` : '0%'
+        progressFill.setCssProps({'--qc-progress-pct': max > 0 ? `${(scrollTop / max) * 100}%` : '0%'})
     }, { signal: abortCtrl.signal })
 
     progressBar._cleanup = () => {
         abortCtrl.abort()
         observer.disconnect()
         sentinel.remove()
-        if (anchor) (anchor as HTMLElement).style.display = ''
+        if (anchor) (anchor as HTMLElement).removeClass('is-hidden')
     }
 }

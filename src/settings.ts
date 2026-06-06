@@ -21,7 +21,7 @@ export class QuickClipSettingTab extends PluginSettingTab {
         const { containerEl } = this
         containerEl.empty()
 
-        containerEl.createEl('h3', { text: 'Capture Settings' })
+        new Setting(containerEl).setName('Capture Settings').setHeading()
 
         new Setting(containerEl)
             .setName('Auto-open on startup')
@@ -97,9 +97,7 @@ export class QuickClipSettingTab extends PluginSettingTab {
 
         // ── Callout Colors (collapsible) ─────────────────────────────────────
         const details = containerEl.createEl('details', { cls: 'qc-colors-details' })
-        const summary = details.createEl('summary', { cls: 'qc-colors-summary' })
-        const summaryH3 = summary.createEl('h3', { text: 'Callout Colors' })
-        summaryH3.style.margin = '0'
+        const summary = details.createEl('summary', { cls: 'qc-colors-summary', text: 'Callout Colors' })
 
         const colorInputs: Record<string, HTMLInputElement> = {}
         const colorResetUpdaters: Array<() => void> = []
@@ -116,8 +114,7 @@ export class QuickClipSettingTab extends PluginSettingTab {
             setIcon(rowReset, 'rotate-ccw')
             rowReset.title = `Reset ${label} to default`
             const updateRowReset = () => {
-                rowReset.style.display =
-                    this.plugin.settings.calloutColors[key] !== DEFAULT_CALLOUT_COLORS[key] ? '' : 'none'
+                rowReset.toggleClass('is-hidden', this.plugin.settings.calloutColors[key] === DEFAULT_CALLOUT_COLORS[key])
             }
             updateRowReset()
             colorResetUpdaters.push(updateRowReset)
@@ -151,10 +148,9 @@ export class QuickClipSettingTab extends PluginSettingTab {
                 }))
 
         // ── Migration (hidden until old clips detected) ──────────────────────
-        const migrateSection = containerEl.createDiv({ cls: 'qc-migrate-section' })
-        migrateSection.style.display = 'none'
+        const migrateSection = containerEl.createDiv({ cls: 'qc-migrate-section is-hidden' })
 
-        migrateSection.createEl('h3', { text: 'Migration' })
+        new Setting(migrateSection).setName('Migration').setHeading()
 
         const desc = migrateSection.createEl('p', { cls: 'qc-migrate-desc' })
         desc.appendText('The following files contain clips saved in the old format. Migrating rewrites them to use ')
@@ -211,7 +207,7 @@ export class QuickClipSettingTab extends PluginSettingTab {
                     const remaining = await scanOldFormatFiles(this.app)
                     renderFileList(remaining)
                     setAllDisabled(false)
-                    if (remaining.length === 0) migrateSection.style.display = 'none'
+                    if (remaining.length === 0) migrateSection.addClass('is-hidden')
                 })
             }
         }
@@ -220,7 +216,7 @@ export class QuickClipSettingTab extends PluginSettingTab {
         if (!(stored && stored.results.length === 0)) {
             scanOldFormatFiles(this.app).then(files => {
                 if (files.length > 0) {
-                    migrateSection.style.display = ''
+                    migrateSection.removeClass('is-hidden')
                     renderFileList(files)
                 }
             })
@@ -261,7 +257,7 @@ export class QuickClipSettingTab extends PluginSettingTab {
             const remaining = await scanOldFormatFiles(this.app)
             renderFileList(remaining)
             setAllDisabled(false)
-            if (remaining.length === 0) migrateSection.style.display = 'none'
+            if (remaining.length === 0) migrateSection.addClass('is-hidden')
             else migrateAllBtn.setText('Migrate all files')
         })
     }

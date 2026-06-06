@@ -70,7 +70,6 @@ const X_ICON_SVG = '<path fill="currentColor" transform="scale(4.16667)" d="M18.
 
 export default class QuickClipCapturePlugin extends Plugin {
     settings!: PluginSettings
-    private calloutStyleEl: HTMLStyleElement | null = null
 
     async onload(): Promise<void> {
         await this.loadSettings()
@@ -143,24 +142,17 @@ export default class QuickClipCapturePlugin extends Plugin {
     }
 
     onunload(): void {
-        this.calloutStyleEl?.remove()
-        this.calloutStyleEl = null
-        this.app.workspace.detachLeavesOfType(VIEW_CLIP_MANAGER)
+        for (const type of Object.keys(DEFAULT_CALLOUT_COLORS)) {
+            document.body.style.removeProperty(`--qc-color-${type}`)
+        }
     }
 
     injectCalloutColors(): void {
-        if (!this.calloutStyleEl) {
-            this.calloutStyleEl = document.createElement('style')
-            this.calloutStyleEl.id = 'quickclip-callout-colors'
-            document.head.appendChild(this.calloutStyleEl)
-        }
         const colors = { ...DEFAULT_CALLOUT_COLORS, ...this.settings.calloutColors }
-        this.calloutStyleEl.textContent = Object.entries(colors)
-            .map(([type, hex]) => {
-                const [r, g, b] = hexToRgb(hex)
-                return `.callout[data-callout="${type}"] { --callout-color: ${r}, ${g}, ${b}; }`
-            })
-            .join('\n')
+        for (const [type, hex] of Object.entries(colors)) {
+            const [r, g, b] = hexToRgb(hex)
+            document.body.style.setProperty(`--qc-color-${type}`, `${r}, ${g}, ${b}`)
+        }
     }
 
     async loadSettings(): Promise<void> {

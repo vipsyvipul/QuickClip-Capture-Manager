@@ -413,7 +413,7 @@ export class ClipManagerView extends ItemView {
     private updateFilterClear(): void {
         if (!this.filterClearBtn) return
         const { filterFormat, filterSource, filterDate, filterNote } = this.plugin.settings
-        this.filterClearBtn.style.display = filterFormat || filterSource || filterDate || filterNote ? '' : 'none'
+        this.filterClearBtn.toggleClass('is-hidden', !(filterFormat || filterSource || filterDate || filterNote))
     }
 
     private getFiltered(): ClipRef[] {
@@ -461,8 +461,7 @@ export class ClipManagerView extends ItemView {
     private renderColumnPicker(container: HTMLElement): void {
         const wrapper = container.createDiv('qc-col-picker-wrapper')
         const btn = wrapper.createEl('button', { cls: 'qc-col-picker-btn', text: 'Columns ▾' })
-        const panel = wrapper.createDiv('qc-col-picker-panel')
-        panel.style.display = 'none'
+        const panel = wrapper.createDiv('qc-col-picker-panel is-hidden')
 
         for (const col of ALL_COLUMNS) {
             if (col.key === 'snippet') continue
@@ -484,8 +483,8 @@ export class ClipManagerView extends ItemView {
 
         btn.addEventListener('click', (e) => {
             e.stopPropagation()
-            const isOpen = panel.style.display !== 'none'
-            panel.style.display = isOpen ? 'none' : ''
+            const isOpen = !panel.hasClass('is-hidden')
+            panel.toggleClass('is-hidden', isOpen)
             if (isOpen) {
                 if (this.colPickerClose) {
                     document.removeEventListener('click', this.colPickerClose)
@@ -493,7 +492,7 @@ export class ClipManagerView extends ItemView {
                 }
             } else {
                 this.colPickerClose = () => {
-                    panel.style.display = 'none'
+                    panel.addClass('is-hidden')
                     document.removeEventListener('click', this.colPickerClose!)
                     this.colPickerClose = null
                 }
@@ -658,7 +657,7 @@ export class ClipManagerView extends ItemView {
             const key = th.dataset.colKey
             if (!key) continue
 
-            if (widths[key]) th.style.minWidth = widths[key] + 'px'
+            if (widths[key]) th.setCssProps({'--qc-col-w': widths[key] + 'px'})
 
             const handle = th.createDiv('qc-resize-handle')
             handle.draggable = false
@@ -668,17 +667,17 @@ export class ClipManagerView extends ItemView {
                 e.stopPropagation()
                 const startX = e.clientX
                 const startW = th.offsetWidth
-                document.body.style.userSelect = 'none'
+                document.body.addClass('qc-no-select')
 
                 const onMove = (ev: MouseEvent) => {
                     const newW = Math.max(60, startW + (ev.clientX - startX))
-                    th.style.minWidth = newW + 'px'
+                    th.setCssProps({'--qc-col-w': newW + 'px'})
                 }
 
                 const cleanup = () => {
                     document.removeEventListener('mousemove', onMove)
                     document.removeEventListener('mouseup', onUp)
-                    document.body.style.userSelect = ''
+                    document.body.removeClass('qc-no-select')
                     this.resizeDragCleanup = null
                 }
 
@@ -867,7 +866,7 @@ export class ClipManagerView extends ItemView {
         }) as HTMLTextAreaElement
         ta.value = noteText
 
-        const resize = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px' }
+        const resize = () => { ta.setCssProps({'--qc-ta-h': 'auto'}); ta.setCssProps({'--qc-ta-h': ta.scrollHeight + 'px'}) }
         resize()
         ta.addEventListener('input', resize)
 

@@ -1,3 +1,8 @@
+/* ── Utility ─────────────────────────────────────────────────── */
+
+.is-hidden { display: none !important; }
+.qc-no-select { user-select: none !important; }
+
 /* ── Highlight Card ─────────────────────────────────────────── */
 
 .qc-highlight-card {
@@ -154,7 +159,10 @@
     color: var(--text-muted);
 }
 
-/* Hide the --- separator that immediately follows a transformed table */
+/* Hide transformed old-format table and the --- separator following it */
+.qc-table-hidden {
+    display: none;
+}
 .markdown-preview-section .qc-table-hidden + *,
 .markdown-reading-view .qc-table-hidden + * {
     display: none;
@@ -207,7 +215,7 @@
 
 .qc-reading-progress-fill {
     height: 100%;
-    width: 0%;
+    width: var(--qc-progress-pct, 0%);
     background: var(--color-accent);
     transition: width 60ms linear;
 }
@@ -369,6 +377,7 @@
 }
 
 th[data-col-key="snippet"] { min-width: 80px; }
+.qc-table thead th { min-width: var(--qc-col-w); }
 
 .qc-resize-handle {
     position: absolute;
@@ -595,6 +604,7 @@ th[data-col-key="has_notes"] {
     resize: none;
     overflow: hidden;
     display: block;
+    height: var(--qc-ta-h, auto);
 }
 .qc-note-input:hover {
     border-bottom-color: var(--background-modifier-border);
@@ -1099,13 +1109,14 @@ th[data-col-key="has_notes"] {
 }
 
 /* ── QuickClip callout type colors and icons ──────────────────────────────── */
+/* --callout-color values are set as CSS vars on document.body by the plugin  */
 
-.callout[data-callout="qc_highlight"] { --callout-icon: highlighter; }
-.callout[data-callout="qc_tweet"]     { --callout-icon: qc-x-brand; }
-.callout[data-callout="qc_pdf_highlight"] { --callout-icon: file-text; }
-.callout[data-callout="qc_image"]    { --callout-icon: image; }
-.callout[data-callout="qc_note"]     { --callout-icon: message-circle; }
-.callout[data-callout="qc_details"]  { --callout-icon: info; }
+.callout[data-callout="qc_highlight"]     { --callout-icon: highlighter;    --callout-color: var(--qc-color-qc_highlight); }
+.callout[data-callout="qc_tweet"]         { --callout-icon: qc-x-brand;     --callout-color: var(--qc-color-qc_tweet); }
+.callout[data-callout="qc_pdf_highlight"] { --callout-icon: file-text;      --callout-color: var(--qc-color-qc_pdf_highlight); }
+.callout[data-callout="qc_image"]         { --callout-icon: image;          --callout-color: var(--qc-color-qc_image); }
+.callout[data-callout="qc_note"]          { --callout-icon: message-circle; --callout-color: var(--qc-color-qc_note); }
+.callout[data-callout="qc_details"]       { --callout-icon: info;           --callout-color: var(--qc-color-qc_details); }
 
 /* ── Collapsible card header ──────────────────────────────────────────────── */
 
